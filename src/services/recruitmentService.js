@@ -1,28 +1,149 @@
 import { getSupabase } from '../lib/supabaseClient';
 import { createRecruitmentService } from './recruitmentBackend.js';
 
-export const listCompanies = (...args) => createRecruitmentService(getSupabase()).listCompanies(...args);
-export const createCompany = (...args) => createRecruitmentService(getSupabase()).createCompany(...args);
-export const updateCompany = (...args) => createRecruitmentService(getSupabase()).updateCompany(...args);
-export const deleteCompany = (...args) => createRecruitmentService(getSupabase()).deleteCompany(...args);
-export const listDrives = (...args) => createRecruitmentService(getSupabase()).listDrives(...args);
-export const createDrive = (...args) => createRecruitmentService(getSupabase()).createDrive(...args);
-export const updateDrive = (...args) => createRecruitmentService(getSupabase()).updateDrive(...args);
-export const updateDriveStatus = (...args) => createRecruitmentService(getSupabase()).updateDriveStatus(...args);
-export const deleteDrive = (...args) => createRecruitmentService(getSupabase()).deleteDrive(...args);
-export const getStudentDrives = (...args) => createRecruitmentService(getSupabase()).getStudentDrives(...args);
-export const applyToDrive = (...args) => createRecruitmentService(getSupabase()).applyToDrive(...args);
-export const getStudentApplications = (...args) => createRecruitmentService(getSupabase()).getStudentApplications(...args);
-export const listDriveApplications = (...args) => createRecruitmentService(getSupabase()).listDriveApplications(...args);
-export const updateApplicationStatus = (...args) => createRecruitmentService(getSupabase()).updateApplicationStatus(...args);
-export const withdrawApplication = (...args) => createRecruitmentService(getSupabase()).withdrawApplication(...args);
-export const deleteApplication = (...args) => createRecruitmentService(getSupabase()).deleteApplication(...args);
-export const createOffer = (...args) => createRecruitmentService(getSupabase()).createOffer(...args);
-export const listApplicationOffers = (...args) => createRecruitmentService(getSupabase()).listApplicationOffers(...args);
-export const updateOffer = (...args) => createRecruitmentService(getSupabase()).updateOffer(...args);
-export const updateOfferStatus = (...args) => createRecruitmentService(getSupabase()).updateOfferStatus(...args);
-export const deleteOffer = (...args) => createRecruitmentService(getSupabase()).deleteOffer(...args);
-export const getRecruitmentSuccessCounts = (...args) => createRecruitmentService(getSupabase()).getRecruitmentSuccessCounts(...args);
+/**
+ * Company, drive, application, stage and offer persistence (Member 2).
+ * Authorization is enforced by RLS: in-charge manages these tables; a student
+ * reads only their own applications/offers and published stage results.
+ * Multiple offers per student are allowed by design (no unique student constraint).
+ */
+
+/** @returns {Promise<object[]>} */
+export async function listCompanies() {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.from('companies').select('*').order('name');
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * @param {string} name
+ * @returns {Promise<object>}
+ */
+export async function createCompany(name) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.from('companies').insert({ name }).select().single();
+  if (error) throw error;
+  return data;
+}
+
+/** @returns {Promise<object[]>} */
+export async function listDrives() {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('drives')
+    .select('*, companies(*)')
+    .order('start_date', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Read-only student list. Eligibility and caller ownership are enforced by RLS
+ * in migration 00003; no student ID or role is accepted from the UI.
+ * @returns {Promise<object[]>}
+ */
+export async function listStudentDrives() {
+  const { data, error } = await getSupabase()
+    .from('drives')
+    .select('*, companies(name), drive_departments(department_id, departments(code))')
+    .in('status', ['published', 'completed'])
+    .order('start_date', { ascending: false });
+  if (error) throw new Error(error.message || 'Could not load recruitment drives.');
+  return data ?? [];
+}
+
+/**
+ * @param {{company_id:string, title:string, start_date:string, status?:string, eligible_graduation_years?:number[], min_cgpa?:number|null, max_backlogs?:number|null, application_deadline?:string|null}} drive Department restrictions are separate drive_departments rows.
+ * @returns {Promise<object>}
+ */
+export async function createDrive(drive) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.from('drives').insert(drive).select().single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * @param {string} id
+ * @param {import('../features/data/contracts.js').DriveStatus} status
+ * @returns {Promise<object>}
+ */
+export async function updateDriveStatus(id, status) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('drives')
+    .update({ status })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * @param {string} studentId
+ * @param {string} driveId
+ * @returns {Promise<object>}
+ */
+export async function applyToDrive(studentId, driveId) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('applications')
+    .insert({ student_id: studentId, drive_id: driveId })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * @param {string} studentId
+ * @returns {Promise<object[]>} Applications with drive/company and offers.
+ */
+export async function getStudentApplications(studentId) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('applications')
+    .select('*, drives(*, companies(*)), offers(*)')
+    .eq('student_id', studentId)
+    .order('applied_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * @param {string} applicationId
+ * @param {{status?:string, annual_ctc_minor?:number|null, currency?:string}} offer
+ * @returns {Promise<object>}
+ */
+export async function createOffer(applicationId, offer) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('offers')
+    .insert({ application_id: applicationId, ...offer })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * @param {string} id
+ * @param {string} status
+ * @returns {Promise<object>}
+ */
+export async function updateOfferStatus(id, status) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('offers')
+    .update({ status })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
 
 /**
  * @param {string} driveId

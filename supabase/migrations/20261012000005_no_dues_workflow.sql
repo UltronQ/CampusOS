@@ -3,7 +3,7 @@ BEGIN;
 ALTER TABLE clearance_items
   ADD CONSTRAINT clearance_item_name_nonempty CHECK (length(trim(name)) > 0);
 ALTER TABLE student_clearances
-  ADD COLUMN remarks TEXT,
+  ADD COLUMN IF NOT EXISTS remarks TEXT,
   ADD COLUMN pending_requirements TEXT[] NOT NULL DEFAULT '{}',
   ADD COLUMN updated_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
   DROP CONSTRAINT student_clearances_approval_consistency,
