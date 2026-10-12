@@ -28,7 +28,7 @@ Integration edits: shared `src/features/data/contracts.js` is v1.4; the in-charg
 
 Member 2 dependency: M2-4's `get_student_no_dues_statement` and mandatory-state rules. Reports reuse that server-calculated status, including `rejected`, `incomplete` and `not_configured`, rather than calculating a competing clearance rule. Member 3 placement reports reuse the M3-3 eligibility/unique-offer rules and cohort denominator. Member 1 continues to own routing and layout; the added wrappers preserve the existing route and component APIs.
 
-Apply all currently present migrations in filename order. The report migration follows M2-4 and M3-3; it does not require the unmerged M2-5 branch. Its version 00008 leaves the existing M2-5 versions 00006/00007 untouched. Future M2-5 integration must review its report queries and service contracts instead of replacing this implementation blindly.
+Apply all currently present migrations in filename order. The report migration follows M2-4 and M3-3; its version 00008 leaves M2-5 versions 00006/00007 untouched. M2-5 and the Supabase configuration PR are now integrated with these reports; see [combined integration decisions](merged-pr-integration.md).
 
 ## Reusable API
 
@@ -92,4 +92,4 @@ Suggested commit: `feat(reports): add authorized placement and no-dues CSV Excel
 
 ## PR #7 conflict resolution
 
-The M2-4 PR branch was updated at `4c2cfd8`, retaining current import contracts and new clearance types. GitHub reports it mergeable/clean. The resolution also tolerates the previously created remarks column and restores clearance lifecycle guards around owner-only demonstration seeding. All 71 tests on that isolated branch passed. The PR was not merged remotely; local main contains its tested integration plus the preserved M3-3 commit `7c58d8f`. M3-4 is local until explicitly committed/pushed.
+The M2-4 PR branch was updated at `4c2cfd8`, retaining current import contracts and new clearance types; GitHub verified the conflict-free result. The resolution also tolerates the previously created remarks column and restores clearance lifecycle guards around owner-only demonstration seeding. All 71 tests on that isolated branch passed. M3-3 is preserved at `7c58d8f`, M3-4 is committed at `67e0c84`, and main contains the combined PR 7/9/10 integration. Current verification is recorded in the combined integration guide.

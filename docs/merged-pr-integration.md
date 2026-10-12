@@ -12,4 +12,6 @@ Default `supabase/seed/seed.sql` remains the repeatable, non-sensitive demonstra
 
 `npm test` now executes both src/tests and tests suites. Browser acceptance remains `npm run test:import-ui`; it covers analytics, report exports/printing and imports. Apply every migration in the exact order in [Supabase setup](supabase-setup.md), including 00006/00007/00008/00009. Configuration support does not itself create a Supabase project or populate `.env.local`.
 
+Combined verification passed: 112 automated tests, six browser acceptance groups and the production build. The import normalization guard preserves field-specific errors (including email) alongside the new numeric JSON validation. Vite retains its non-blocking large-bundle warning.
+
 M3-4's seven reports and real CSV/XLSX serializer remain the application reporting API. The three-kind M2-5 `queryReportRecords` endpoint is retained for its existing consumers and verification suite; do not replace the M3-4 page with a serializer scaffold. No student role is added; trusted data-layer authorization remains authoritative.

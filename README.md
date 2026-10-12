@@ -12,4 +12,4 @@ Copy the actual Project URL and public publishable key from Supabase's Connect d
 - [Shared JavaScript contracts](docs/data-contracts.md)
 - [Combined PR integration decisions](docs/merged-pr-integration.md)
 
-Checks: `npm test`, `node --test tests/*.test.js`, `npm run test:import-ui`, `npm run build`.
+Checks: `npm test` (both test folders), `npm run test:import-ui`, `npm run build`.

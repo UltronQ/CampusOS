@@ -1,6 +1,32 @@
 -- Combined M2-2/M2-5 contract: numeric JSON fields remain typed at the trusted boundary.
 -- Preserve confirmation, configured limits, atomic/partial handling and audit counts.
 BEGIN;
+-- Preserve meaningful per-field diagnostics when the M2-5 normalization trigger
+-- runs before M2-2's validator. Validation must not erase the row's error field.
+CREATE OR REPLACE FUNCTION public.normalize_student_record() RETURNS TRIGGER
+LANGUAGE plpgsql SET search_path = public,pg_temp AS $$
+BEGIN
+  NEW.student_number := public.campus_trim(NEW.student_number);
+  NEW.full_name := public.campus_trim(NEW.full_name);
+  NEW.email := lower(public.campus_trim(NEW.email::TEXT));
+  NEW.phone := nullif(public.campus_trim(NEW.phone),'');
+  IF NEW.student_number IS NULL OR length(NEW.student_number) NOT BETWEEN 1 AND 128 THEN
+    RAISE EXCEPTION 'Invalid student roll number' USING ERRCODE='23514', DETAIL='student_number';
+  END IF;
+  IF NEW.full_name IS NULL OR length(NEW.full_name) NOT BETWEEN 1 AND 200 THEN
+    RAISE EXCEPTION 'Invalid student name' USING ERRCODE='23514', DETAIL='full_name';
+  END IF;
+  IF NEW.email IS NULL OR length(NEW.email::TEXT)>320
+    OR NEW.email::TEXT !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$' THEN
+    RAISE EXCEPTION 'Invalid student email' USING ERRCODE='23514', DETAIL='email';
+  END IF;
+  IF NEW.phone IS NOT NULL AND (NEW.phone !~ '^\+?[0-9 ()-]+$'
+    OR length(regexp_replace(NEW.phone,'[^0-9]','','g')) NOT BETWEEN 7 AND 15) THEN
+    RAISE EXCEPTION 'Invalid student phone' USING ERRCODE='23514', DETAIL='phone';
+  END IF;
+  RETURN NEW;
+END;
+$$;
 CREATE OR REPLACE FUNCTION public.commit_student_import(
   p_rows JSONB, p_confirmed BOOLEAN DEFAULT FALSE, p_mode TEXT DEFAULT 'atomic'
 ) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
