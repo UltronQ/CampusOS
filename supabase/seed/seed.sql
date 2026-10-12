@@ -3,6 +3,21 @@
 -- approval evidence; without one, terminal demo decisions remain pending.
 BEGIN;
 
+-- Historical fixtures deliberately include withdrawn/cancelled placements.
+-- Only the trusted table owner can suspend these lifecycle triggers; the
+-- transaction restores them before commit, without weakening runtime policies.
+DO $$
+DECLARE item record;
+BEGIN
+  FOR item IN SELECT tgrelid::regclass AS relation, tgname FROM pg_trigger
+    WHERE NOT tgisinternal AND tgrelid IN ('public.drives'::regclass,
+      'public.applications'::regclass, 'public.offers'::regclass)
+      AND tgname IN ('guard_drive', 'guard_application', 'guard_offer') LOOP
+    EXECUTE format('ALTER TABLE %s DISABLE TRIGGER %I', item.relation, item.tgname);
+  END LOOP;
+END;
+$$;
+
 -- Departments
 INSERT INTO departments (id, code, name) VALUES
   ('11111111-1111-1111-1111-111111111111', 'CSE', 'Computer Science'),
@@ -87,5 +102,17 @@ SELECT d.id::uuid, d.student_id::uuid, d.clearance_item_id::uuid,
     THEN d.approved_at::timestamptz END
 FROM decisions d LEFT JOIN approver a ON true
 ON CONFLICT DO NOTHING;
+
+DO $$
+DECLARE item record;
+BEGIN
+  FOR item IN SELECT tgrelid::regclass AS relation, tgname FROM pg_trigger
+    WHERE NOT tgisinternal AND tgrelid IN ('public.drives'::regclass,
+      'public.applications'::regclass, 'public.offers'::regclass)
+      AND tgname IN ('guard_drive', 'guard_application', 'guard_offer') LOOP
+    EXECUTE format('ALTER TABLE %s ENABLE TRIGGER %I', item.relation, item.tgname);
+  END LOOP;
+END;
+$$;
 
 COMMIT;

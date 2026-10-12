@@ -1,4 +1,5 @@
 import { getSupabase } from '../lib/supabaseClient';
+import { createRecruitmentService } from './recruitmentBackend.js';
 
 /**
  * Company, drive, application, stage and offer persistence (Member 2).

@@ -65,6 +65,9 @@ test('all migrations and seed run on a fresh PostgreSQL database without auth ac
       (SELECT count(*)::int FROM profiles) AS profiles,
       (SELECT count(*)::int FROM student_clearances WHERE status <> 'pending') AS approved`);
     assert.deepEqual(rows[0], { students: 5, offers: 8, profiles: 0, approved: 0 });
+    const guards = await db.query("SELECT tgname, tgenabled FROM pg_trigger WHERE tgname IN ('guard_drive', 'guard_application', 'guard_offer') ORDER BY tgname");
+    assert.equal(guards.rows.length, 3);
+    assert.ok(guards.rows.every((guard) => guard.tgenabled === 'O'), 'Seed must restore all recruitment lifecycle guards');
   } finally { await db.close(); }
 });
 

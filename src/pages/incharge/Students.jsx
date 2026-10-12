@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import ModulePage from '../../components/layout/ModulePage';
 import DataTable from '../../components/ui/DataTable';
-import StatusBadge from '../../components/ui/StatusBadge';
 import FormField from '../../components/ui/FormField';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
@@ -10,7 +9,7 @@ import { LoadingState, ErrorState, EmptyState } from '../../components/ui/States
 import StudentForm from '../../components/students/StudentForm';
 import { useStudents, useDepartments } from '../../hooks/useStudents';
 import * as studentsService from '../../services/studentsService';
-import { IMPORT_CONFIG, ELIGIBILITY_STATUSES } from '../../app/config';
+import { IMPORT_CONFIG } from '../../app/config';
 
 /**
  * Module 1 — Student & department management (Placement In-Charge).
@@ -103,8 +102,6 @@ export default function Students() {
     q: '',
     department_id: '',
     batch: '',
-    registered: '',
-    eligibility: '',
   });
   const [showDepartments, setShowDepartments] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
@@ -183,26 +180,26 @@ export default function Students() {
     {
       key: 'program',
       label: 'Program / Year / Section',
-      render: (row) => (
-        <span className="text-xs">
-          {row.program ?? '—'} · Year {row.academic_year ?? '—'} · {row.section ?? '—'}
-        </span>
-      ),
+      render: () => <span className="text-xs text-slate-400">Pending schema</span>,
     },
-    { key: 'graduation_year', label: 'Batch', align: 'right' },
+    {
+      key: 'graduation_year',
+      label: 'Batch',
+      align: 'right',
+    },
+    {
+      key: 'cgpa',
+      label: 'CGPA',
+      align: 'right',
+      render: (row) => <span className="text-xs tabular-nums">{row.cgpa ?? '—'}</span>,
+    },
+    {
+      key: 'backlogs',
+      label: 'Backlogs',
+      align: 'right',
+      render: (row) => <span className="text-xs tabular-nums">{row.backlogs ?? '—'}</span>,
+    },
     { key: 'email', label: 'University email' },
-    {
-      key: 'placement_registered',
-      label: 'Placement reg.',
-      render: (row) => (
-        <StatusBadge status={row.placement_registered ? 'registered' : 'not_registered'} />
-      ),
-    },
-    {
-      key: 'eligibility_status',
-      label: 'Eligibility',
-      render: (row) => <StatusBadge status={row.eligibility_status ?? 'pending'} />,
-    },
     {
       key: 'actions',
       label: 'Actions',
@@ -258,31 +255,8 @@ export default function Students() {
               </option>
             ))}
           </FormField>
-          <FormField
-            label="Placement registration"
-            as="select"
-            value={filters.registered}
-            onChange={setFilter('registered')}
-          >
-            <option value="">Any status</option>
-            <option value="true">Registered</option>
-            <option value="false">Not registered</option>
-          </FormField>
-          <FormField
-            label="Eligibility"
-            as="select"
-            value={filters.eligibility}
-            onChange={setFilter('eligibility')}
-          >
-            <option value="">Any status</option>
-            {ELIGIBILITY_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {status.replace('_', ' ')}
-              </option>
-            ))}
-          </FormField>
           <div className="flex items-end gap-2">
-            <Button variant="secondary" onClick={() => setFilters({ q: '', department_id: '', batch: '', registered: '', eligibility: '' })}>
+            <Button variant="secondary" onClick={() => setFilters({ q: '', department_id: '', batch: '' })}>
               Clear
             </Button>
             <Button onClick={openAdd}>Add student</Button>
@@ -295,6 +269,10 @@ export default function Students() {
               : students.error
                 ? 'Students unavailable'
                 : `${students.data.length} student${students.data.length === 1 ? '' : 's'} shown`}
+          </span>
+          <span className="text-slate-400">
+            Placement-registration and eligibility columns arrive with the Member 2 schema
+            extension.
           </span>
           <button
             type="button"
@@ -323,12 +301,12 @@ export default function Students() {
         <ErrorState title="Students unavailable" error={students.error} />
       ) : students.data.length === 0 ? (
         <EmptyState
-          title={filters.q || filters.department_id || filters.batch || filters.registered || filters.eligibility
+          title={filters.q || filters.department_id || filters.batch
             ? 'No students match these filters'
             : 'No students yet'}
           actions={<Button onClick={openAdd}>Add the first student</Button>}
         >
-          {filters.q || filters.department_id || filters.batch || filters.registered || filters.eligibility
+          {filters.q || filters.department_id || filters.batch
             ? 'Adjust or clear the filters, import a batch from the Import Students page, or add a student manually.'
             : 'Add students one at a time or import a validated CSV/XLSX batch.'}
         </EmptyState>

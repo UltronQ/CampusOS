@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ModulePage from '../../components/layout/ModulePage';
 import DataTable from '../../components/ui/DataTable';
 import Button from '../../components/ui/Button';
@@ -24,6 +25,7 @@ const columns = [
 ];
 
 export default function ImportStudents() {
+  const navigate = useNavigate();
   const workflow = useRef(null);
   const selectedFile = useRef(null);
   const request = useRef(0);
@@ -163,7 +165,9 @@ export default function ImportStudents() {
               Row {row.source_row} ({row.status}): {row.errors.map((issue) => issue.message).join(' ')}
             </p>
           ))}
-          <a href="/incharge/students" className="inline-block text-indigo-700 underline">View student directory</a>
+          <Button variant="secondary" onClick={() => navigate('/incharge/students')}>
+            View student directory
+          </Button>
         </section>
       ) : null}
       {!busy && !validation && !error ? (

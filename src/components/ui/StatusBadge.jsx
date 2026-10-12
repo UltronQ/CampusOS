@@ -32,13 +32,24 @@ const TONES = {
   not_registered: 'bg-slate-100 text-slate-600 ring-slate-200',
   eligible: 'bg-emerald-100 text-emerald-800 ring-emerald-200',
   ineligible: 'bg-red-100 text-red-800 ring-red-200',
+  // checklist configuration (M1-4)
+  mandatory: 'bg-amber-100 text-amber-800 ring-amber-200',
+  optional: 'bg-slate-100 text-slate-600 ring-slate-200',
+  inactive: 'bg-slate-200 text-slate-500 ring-slate-300',
 };
 
 const DEFAULT_TONE = 'bg-slate-100 text-slate-600 ring-slate-200';
 
-export function StatusBadge({ status, className = '' }) {
+export function StatusBadge({ status, tone: toneOverride, className = '' }) {
   if (status === null || status === undefined || status === '') return null;
-  const tone = TONES[status] ?? DEFAULT_TONE;
+  const tone = toneOverride
+    ? {
+        success: 'bg-emerald-100 text-emerald-800 ring-emerald-200',
+        warning: 'bg-amber-100 text-amber-800 ring-amber-200',
+        danger: 'bg-red-100 text-red-800 ring-red-200',
+        neutral: 'bg-slate-100 text-slate-600 ring-slate-200',
+      }[toneOverride] ?? TONES[status]
+    : TONES[status] ?? DEFAULT_TONE;
   const label = String(status).replace(/_/g, ' ');
   return (
     <span
