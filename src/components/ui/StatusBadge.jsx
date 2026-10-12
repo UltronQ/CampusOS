@@ -27,6 +27,11 @@ const TONES = {
   // stage results
   passed: 'bg-emerald-100 text-emerald-800 ring-emerald-200',
   failed: 'bg-red-100 text-red-800 ring-red-200',
+  // student directory (M1-2)
+  registered: 'bg-emerald-100 text-emerald-800 ring-emerald-200',
+  not_registered: 'bg-slate-100 text-slate-600 ring-slate-200',
+  eligible: 'bg-emerald-100 text-emerald-800 ring-emerald-200',
+  ineligible: 'bg-red-100 text-red-800 ring-red-200',
 };
 
 const DEFAULT_TONE = 'bg-slate-100 text-slate-600 ring-slate-200';
