@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from '../components/auth/ProtectedRoute';
 import AppShell from '../components/layout/AppShell';
 import SignIn from '../pages/SignIn';
+import AuthCallback from '../pages/AuthCallback';
 import NotFound from '../pages/NotFound';
 import Unauthorized from '../pages/Unauthorized';
 import InchargeDashboard from '../pages/incharge/Dashboard';
@@ -33,6 +34,7 @@ export default function AppRoutes() {
     <Routes>
       <Route path="/" element={<Navigate to="/signin" replace />} />
       <Route path="/signin" element={<SignIn />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/unauthorized" element={<Unauthorized />} />
 
       <Route

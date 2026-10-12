@@ -6,7 +6,8 @@
   "scripts": {
     "samples:import": "node scripts/generateStudentImportSamples.js",
     "test:import-ui": "node src/tests/browser/studentImport.browser.js",
-    "test": "node --test src/tests/*.test.js",
+    "test:google-ui": "node src/tests/browser/googleOAuth.browser.js",
+    "test": "node --test src/tests/*.test.js tests/*.test.js",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
