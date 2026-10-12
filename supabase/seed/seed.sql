@@ -1,17 +1,13 @@
--- Seed data aligned with M3-1 fixtures
--- Note: profiles require auth.users; in a real Supabase environment these would be linked.
--- This seed is for local dev/testing with service role.
+-- Synthetic development data. Run as a trusted database owner after migrations.
+-- Never creates auth users or assigns roles. Existing in-charge profiles supply
+-- approval evidence; without one, terminal demo decisions remain pending.
+BEGIN;
 
 -- Departments
 INSERT INTO departments (id, code, name) VALUES
   ('11111111-1111-1111-1111-111111111111', 'CSE', 'Computer Science'),
   ('22222222-2222-2222-2222-222222222222', 'ECE', 'Electronics'),
   ('33333333-3333-3333-3333-333333333333', 'ME', 'Mechanical')
-ON CONFLICT DO NOTHING;
-
--- Incharge profile (dummy auth user id for seed)
-INSERT INTO profiles (id, role) VALUES
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'placement_incharge')
 ON CONFLICT DO NOTHING;
 
 -- Students
@@ -51,31 +47,45 @@ ON CONFLICT DO NOTHING;
 
 -- Offers
 INSERT INTO offers (id, application_id, status, annual_ctc_minor, currency) VALUES
-  ('o1000000-o100-o100-o100-o10000000001', 'a1000000-a100-a100-a100-a10000000001', 'offered', 10000000, 'INR'),
-  ('o1000000-o100-o100-o100-o10000000002', 'a1000000-a100-a100-a100-a10000000002', 'accepted', 20000000, 'INR'),
-  ('o1000000-o100-o100-o100-o10000000003', 'a1000000-a100-a100-a100-a10000000003', 'accepted', 99000000, 'INR'),
-  ('o1000000-o100-o100-o100-o10000000004', 'a1000000-a100-a100-a100-a10000000004', 'accepted', 88000000, 'INR'),
-  ('o1000000-o100-o100-o100-o10000000005', 'a1000000-a100-a100-a100-a10000000005', 'declined', 77000000, 'INR'),
-  ('o1000000-o100-o100-o100-o10000000006', 'a1000000-a100-a100-a100-a10000000006', 'accepted', NULL, 'INR'),
-  ('o1000000-o100-o100-o100-o10000000007', 'a1000000-a100-a100-a100-a10000000005', 'revoked', 66000000, 'INR'),
-  ('o1000000-o100-o100-o100-o10000000008', 'a1000000-a100-a100-a100-a10000000008', 'accepted', 55000000, 'INR')
+  ('f1000000-f100-f100-f100-f10000000001', 'a1000000-a100-a100-a100-a10000000001', 'offered', 10000000, 'INR'),
+  ('f1000000-f100-f100-f100-f10000000002', 'a1000000-a100-a100-a100-a10000000002', 'accepted', 20000000, 'INR'),
+  ('f1000000-f100-f100-f100-f10000000003', 'a1000000-a100-a100-a100-a10000000003', 'accepted', 99000000, 'INR'),
+  ('f1000000-f100-f100-f100-f10000000004', 'a1000000-a100-a100-a100-a10000000004', 'accepted', 88000000, 'INR'),
+  ('f1000000-f100-f100-f100-f10000000005', 'a1000000-a100-a100-a100-a10000000005', 'declined', 77000000, 'INR'),
+  ('f1000000-f100-f100-f100-f10000000006', 'a1000000-a100-a100-a100-a10000000006', 'accepted', NULL, 'INR'),
+  ('f1000000-f100-f100-f100-f10000000007', 'a1000000-a100-a100-a100-a10000000005', 'revoked', 66000000, 'INR'),
+  ('f1000000-f100-f100-f100-f10000000008', 'a1000000-a100-a100-a100-a10000000008', 'accepted', 55000000, 'INR')
 ON CONFLICT DO NOTHING;
 
 -- Clearance items
 INSERT INTO clearance_items (id, department_id, name, is_mandatory, is_active) VALUES
-  ('i1000000-i100-i100-i100-i10000000001', '11111111-1111-1111-1111-111111111111', 'Library', TRUE, TRUE),
-  ('i1000000-i100-i100-i100-i10000000002', '11111111-1111-1111-1111-111111111111', 'Lab', TRUE, TRUE),
-  ('i1000000-i100-i100-i100-i10000000003', '22222222-2222-2222-2222-222222222222', 'Library', TRUE, TRUE),
-  ('i1000000-i100-i100-i100-i10000000004', '11111111-1111-1111-1111-111111111111', 'Optional Survey', FALSE, TRUE),
-  ('i1000000-i100-i100-i100-i10000000005', '11111111-1111-1111-1111-111111111111', 'Old Checklist', TRUE, FALSE)
+  ('b1000000-b100-b100-b100-b10000000001', '11111111-1111-1111-1111-111111111111', 'Library', TRUE, TRUE),
+  ('b1000000-b100-b100-b100-b10000000002', '11111111-1111-1111-1111-111111111111', 'Lab', TRUE, TRUE),
+  ('b1000000-b100-b100-b100-b10000000003', '22222222-2222-2222-2222-222222222222', 'Library', TRUE, TRUE),
+  ('b1000000-b100-b100-b100-b10000000004', '11111111-1111-1111-1111-111111111111', 'Optional Survey', FALSE, TRUE),
+  ('b1000000-b100-b100-b100-b10000000005', '11111111-1111-1111-1111-111111111111', 'Old Checklist', TRUE, FALSE)
 ON CONFLICT DO NOTHING;
 
--- Student clearances
-INSERT INTO student_clearances (id, student_id, clearance_item_id, status, approved_by, approved_at) VALUES
-  ('cl000000-cl000-cl000-cl000-cl000000001', '00000000-0000-0000-0000-000000000001', 'i1000000-i100-i100-i100-i10000000001', 'cleared', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '2026-10-12T09:00:00Z'),
-  ('cl000000-cl000-cl000-cl000-cl000000002', '00000000-0000-0000-0000-000000000001', 'i1000000-i100-i100-i100-i10000000002', 'not_applicable', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '2026-10-12T09:00:00Z'),
-  ('cl000000-cl000-cl000-cl000-cl000000003', '00000000-0000-0000-0000-000000000002', 'i1000000-i100-i100-i100-i10000000001', 'pending', NULL, NULL),
-  ('cl000000-cl000-cl000-cl000-cl000000004', '00000000-0000-0000-0000-000000000004', 'i1000000-i100-i100-i100-i10000000003', 'cleared', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '2026-10-12T09:00:00Z'),
-  ('cl000000-cl000-cl000-cl000-cl000000005', '00000000-0000-0000-0000-000000000001', 'i1000000-i100-i100-i100-i10000000004', 'pending', NULL, NULL),
-  ('cl000000-cl000-cl000-cl000-cl000000006', '00000000-0000-0000-0000-000000000001', 'i1000000-i100-i100-i100-i10000000005', 'pending', NULL, NULL)
+-- Student clearances: terminal approvals require a real existing in-charge.
+WITH approver AS (
+  SELECT id FROM public.profiles WHERE role = 'placement_incharge' ORDER BY id LIMIT 1
+), decisions (id, student_id, clearance_item_id, status, approved_at) AS (
+  VALUES
+  ('c1000000-c100-c100-c100-c10000000001', '00000000-0000-0000-0000-000000000001', 'b1000000-b100-b100-b100-b10000000001', 'cleared', '2026-10-12T09:00:00Z'),
+  ('c1000000-c100-c100-c100-c10000000002', '00000000-0000-0000-0000-000000000001', 'b1000000-b100-b100-b100-b10000000002', 'not_applicable', '2026-10-12T09:00:00Z'),
+  ('c1000000-c100-c100-c100-c10000000003', '00000000-0000-0000-0000-000000000002', 'b1000000-b100-b100-b100-b10000000001', 'pending', NULL),
+  ('c1000000-c100-c100-c100-c10000000004', '00000000-0000-0000-0000-000000000004', 'b1000000-b100-b100-b100-b10000000003', 'cleared', '2026-10-12T09:00:00Z'),
+  ('c1000000-c100-c100-c100-c10000000005', '00000000-0000-0000-0000-000000000001', 'b1000000-b100-b100-b100-b10000000004', 'pending', NULL),
+  ('c1000000-c100-c100-c100-c10000000006', '00000000-0000-0000-0000-000000000001', 'b1000000-b100-b100-b100-b10000000005', 'pending', NULL)
+)
+INSERT INTO public.student_clearances
+  (id, student_id, clearance_item_id, status, approved_by, approved_at)
+SELECT d.id::uuid, d.student_id::uuid, d.clearance_item_id::uuid,
+  CASE WHEN a.id IS NULL THEN 'pending' ELSE d.status END::public.clearance_status,
+  CASE WHEN d.status IN ('cleared', 'not_applicable') THEN a.id END,
+  CASE WHEN a.id IS NOT NULL AND d.status IN ('cleared', 'not_applicable')
+    THEN d.approved_at::timestamptz END
+FROM decisions d LEFT JOIN approver a ON true
 ON CONFLICT DO NOTHING;
+
+COMMIT;

@@ -1,14 +1,14 @@
 /**
- * CampusOS M3-1 shared contracts (v1, proposed pending Member 2 agreement).
+ * CampusOS shared contracts aligned with the phase-one database migrations.
  * Plain JavaScript + JSDoc: no TypeScript build required. IDs are opaque strings.
  * Records and authorization come from Supabase; never trust a client role filter.
  * Money is integer minor units (INR paise), never floating-point currency.
  */
-export const DATA_CONTRACT_VERSION = '1.0.0';
+export const DATA_CONTRACT_VERSION = '1.1.0';
 export const USER_ROLES = Object.freeze(['placement_incharge', 'student']);
 export const IMPORT_HEADERS = Object.freeze([
   'student_number', 'full_name', 'email', 'department_code',
-  'graduation_year', 'cgpa', 'phone',
+  'graduation_year', 'cgpa', 'phone', 'backlogs',
 ]);
 export const APPLICATION_STATUSES = Object.freeze([
   'applied', 'in_progress', 'selected', 'rejected', 'withdrawn',
@@ -19,6 +19,7 @@ export const CLEARANCE_STATUSES = Object.freeze(['pending', 'cleared', 'not_appl
 
 /** @typedef {string} ID */
 /** @typedef {'placement_incharge'|'student'} UserRole */
+/** @typedef {'draft'|'published'|'completed'|'cancelled'} DriveStatus */
 /** @typedef {'pending'|'cleared'|'not_applicable'} ClearanceStatus */
 /** @typedef {'pending'|'cleared'|'not_configured'} OverallClearanceStatus */
 /** @typedef {{code:string, field:string|null, message:string}} ValidationIssue */
@@ -35,6 +36,7 @@ export const CLEARANCE_STATUSES = Object.freeze(['pending', 'cleared', 'not_appl
  * @property {number} graduation_year
  * @property {number|null} cgpa
  * @property {string|null} phone
+ * @property {number|null} backlogs Nonnegative integer; null means unknown.
  */
 /** @typedef {{source_row:number, raw:Record<string,unknown>, normalized:StudentImportRow|null, errors:ValidationIssue[], warnings:ValidationIssue[]}} ImportRowValidation */
 /**
@@ -73,7 +75,7 @@ export const CLEARANCE_STATUSES = Object.freeze(['pending', 'cleared', 'not_appl
 /** @typedef {{department_ids:ID[], graduation_years:number[]}} NoDuesAnalyticsFilters */
 /** @typedef {{numerator:number, denominator:number, percent:number|null}} Rate */
 /** @typedef {{count:number, min_minor:number|null, max_minor:number|null, mean_minor:number|null, median_minor:number|null, currency:'INR'}} SalaryStatistics */
-/** @typedef {{department_id:ID, department_code:string, total_students:number, placed_students:number, unplaced_students:number, placement_rate:Rate, successful_offers:number}} DepartmentPlacementSummary */
+/** @typedef {{department_id:ID, department_code:string, total_students:number, eligible_students:number, placed_students:number, unplaced_students:number, placement_rate:Rate, successful_offers:number}} DepartmentPlacementSummary */
 /**
  * successful_offers includes offered/accepted only; placed_students is distinct
  * student IDs in those offers after all joins/exclusions. Salary is offer-weighted.
@@ -81,7 +83,8 @@ export const CLEARANCE_STATUSES = Object.freeze(['pending', 'cleared', 'not_appl
  * @property {string} contract_version
  * @property {string} snapshot_at Server timestamp, metadata only.
  * @property {PlacementAnalyticsFilters} filters Canonical validated filters.
- * @property {number} total_students Cohort denominator, independent of drive/company filters.
+ * @property {number} total_students Entire selected student cohort.
+ * @property {number} eligible_students Distinct cohort students eligible for at least one scoped drive; placement-rate denominator.
  * @property {number} placed_students
  * @property {number} unplaced_students
  * @property {Rate} placement_rate
