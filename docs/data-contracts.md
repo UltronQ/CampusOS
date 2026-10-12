@@ -76,6 +76,12 @@ mandatory_items counts student-item pairs (not template definitions) partitioned
 
 ## Reports and Member 1 signatures
 
+Backend query implementation: `src/services/reportService.js:queryReportRecords`.
+This returns typed current records from one RLS-scoped snapshot for the three
+report kinds; Member 3 still owns `exportReport` and serialization. Use shared
+`ReportRecordsInput/ReportRecordsOutput` types. Workflow report rows use
+`incomplete` and include `mandatory_rejected`; map legacy analytics buckets explicitly.
+
 Member 1 will import the named implementation functions from the planned modules and supply contracts.js DTOs. Await validateStudentFile -> render errors/preview -> invoke Member 2 commitStudentImport only when can_commit. Filters are controlled arrays and nullable dates; do not use labels as IDs. Await analytics and render supplied numbers; do not recompute placed_students from offers in the UI. Async service failures reject with a DataFeatureError-shaped error; import validation failures are returned as validation results. Clear stale success state on failure.
 
 exportReport returns a real Blob; Member 1 creates an object URL, downloads using filename, and revokes the URL. Student scope is enforced server-side even when student_ids is empty or forged. Placement filters apply to placement kinds; no-dues kinds accept only no-dues filters. student_ids narrows rows after authorization and before aggregating any export-specific summary.

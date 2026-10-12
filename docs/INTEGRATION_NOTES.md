@@ -1,4 +1,4 @@
-# CampusOS - Integration Notes (Member 2)
+# CampusOS backend integration
 
 ## Database (Supabase)
 - Apply all migrations in filename order, including `20251012000003_phase_one_alignment.sql`. Previously migrated databases need only the new migration; do not reset their data.
@@ -11,15 +11,9 @@
   - Students read only published/completed drives matching their linked student record; eligibility is enforced by RLS, not UI filtering
   - In-charge retains management access to all drives
 
-## Environment variables (client)
-- `VITE_SUPABASE_URL` - Supabase project URL
-- `VITE_SUPABASE_ANON_KEY` - Supabase anon key (never service role)
+Apply every migration in `supabase/migrations` in filename order, committing the clearance enum addition before the workflow migration. The development seed is now executable, uses valid UUIDs and follows recruitment transitions; it requires three documented disposable Auth identities.
 
-## Merge resolution with main (M1-1 frontend)
-Member 1's frontend foundation landed on `main` first and created two of the same files. Resolved as follows (no Member 1 API was removed):
-- `src/lib/supabaseClient.js` — kept Member 1's lazy client (`getSupabase()`, `isSupabaseConfigured()`). There is no `supabase` const export; every Member 2 service calls `getSupabase()`.
-- `src/services/authService.js` — one file, two ownership areas: Member 1 keeps `getSession`, `signInWithPassword`, `signOut`, `onAuthStateChange`, `fetchProfile` (used by `src/hooks/useAuth.jsx`); Member 2 added `getCurrentUser`, `getCurrentProfile`, `isPlacementIncharge`, `getStudentRecord` on the same client.
-- Member 2's `studentService.js`, `recruitmentService.js` and `clearanceService.js` were updated to `getSupabase()` so they work against Member 1's client.
+Member 1 keeps the existing auth/session boundary. Student, recruitment and clearance service exports remain available. Students can read only their own private records, withdraw their own eligible applications, and respond to their own offered offers; every privileged operation is guarded by RLS or trusted database validation.
 
 ## Services (src/services)
 - M2-2 adds `studentManagementService.js`/`authSessionService.js` behind the stable `studentService.js`, `studentsService.js` and `authService.js` exports. See `docs/m2-2-authentication-student-services.md` for the full API, confirmation, count and authorization contract.

@@ -21,6 +21,7 @@ const TONES = {
   revoked: 'bg-slate-200 text-slate-600 ring-slate-300',
   // clearance lifecycle
   pending: 'bg-amber-100 text-amber-800 ring-amber-200',
+  incomplete: 'bg-amber-100 text-amber-800 ring-amber-200',
   cleared: 'bg-emerald-100 text-emerald-800 ring-emerald-200',
   not_applicable: 'bg-slate-100 text-slate-500 ring-slate-200',
   not_configured: 'bg-slate-100 text-slate-600 ring-slate-200',

@@ -23,8 +23,7 @@ $$;
 INSERT INTO departments (id, code, name) VALUES
   ('11111111-1111-1111-1111-111111111111', 'CSE', 'Computer Science'),
   ('22222222-2222-2222-2222-222222222222', 'ECE', 'Electronics'),
-  ('33333333-3333-3333-3333-333333333333', 'ME', 'Mechanical')
-ON CONFLICT DO NOTHING;
+  ('33333333-3333-3333-3333-333333333333', 'ME', 'Mechanical');
 
 -- Students
 INSERT INTO students (id, student_number, full_name, email, department_id, graduation_year, cgpa, phone) VALUES
@@ -32,34 +31,41 @@ INSERT INTO students (id, student_number, full_name, email, department_id, gradu
   ('00000000-0000-0000-0000-000000000002', '002', 'Demo Student Two', 'two@example.test', '11111111-1111-1111-1111-111111111111', 2027, NULL, NULL),
   ('00000000-0000-0000-0000-000000000003', '003', 'Demo Student Three', 'three@example.test', '11111111-1111-1111-1111-111111111111', 2027, 7.0, NULL),
   ('00000000-0000-0000-0000-000000000004', '004', 'Demo Student Four', 'four@example.test', '22222222-2222-2222-2222-222222222222', 2027, 9.0, NULL),
-  ('00000000-0000-0000-0000-000000000005', '005', 'Demo Student Five', 'five@example.test', '33333333-3333-3333-3333-333333333333', 2027, NULL, NULL)
-ON CONFLICT DO NOTHING;
+  ('00000000-0000-0000-0000-000000000005', '005', 'Demo Student Five', 'five@example.test', '33333333-3333-3333-3333-333333333333', 2027, NULL, NULL);
+
+UPDATE students SET user_id='bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1' WHERE student_number='001';
+UPDATE students SET user_id='bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2' WHERE student_number='002';
 
 -- Companies
 INSERT INTO companies (id, name) VALUES
   ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'Demo Systems'),
-  ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'Demo Labs')
-ON CONFLICT DO NOTHING;
+  ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'Demo Labs');
 
 -- Drives
 INSERT INTO drives (id, company_id, title, start_date, status) VALUES
-  ('e0000000-e000-e000-e000-e00000000001', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'Graduate Engineer', '2026-10-01', 'published'),
-  ('e0000000-e000-e000-e000-e00000000002', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'Associate Engineer', '2026-10-12', 'completed'),
-  ('e0000000-e000-e000-e000-e00000000003', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'Cancelled Drive', '2026-10-10', 'cancelled'),
-  ('e0000000-e000-e000-e000-e00000000004', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'Draft Drive', '2026-10-11', 'draft')
-ON CONFLICT DO NOTHING;
+  ('e0000000-e000-e000-e000-e00000000001', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'Graduate Engineer', '2026-10-01', 'draft'),
+  ('e0000000-e000-e000-e000-e00000000002', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'Associate Engineer', '2026-10-12', 'draft'),
+  ('e0000000-e000-e000-e000-e00000000003', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'Cancelled Drive', '2026-10-10', 'draft'),
+  ('e0000000-e000-e000-e000-e00000000004', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'Draft Drive', '2026-10-11', 'draft');
+
+UPDATE drives SET status='published' WHERE id IN ('e0000000-e000-e000-e000-e00000000001',
+  'e0000000-e000-e000-e000-e00000000002','e0000000-e000-e000-e000-e00000000003');
 
 -- Applications
 INSERT INTO applications (id, student_id, drive_id, status) VALUES
-  ('a1000000-a100-a100-a100-a10000000001', '00000000-0000-0000-0000-000000000001', 'e0000000-e000-e000-e000-e00000000001', 'selected'),
-  ('a1000000-a100-a100-a100-a10000000002', '00000000-0000-0000-0000-000000000001', 'e0000000-e000-e000-e000-e00000000002', 'selected'),
-  ('a1000000-a100-a100-a100-a10000000003', '00000000-0000-0000-0000-000000000002', 'e0000000-e000-e000-e000-e00000000003', 'selected'),
-  ('a1000000-a100-a100-a100-a10000000004', '00000000-0000-0000-0000-000000000002', 'e0000000-e000-e000-e000-e00000000001', 'withdrawn'),
-  ('a1000000-a100-a100-a100-a10000000005', '00000000-0000-0000-0000-000000000003', 'e0000000-e000-e000-e000-e00000000001', 'selected'),
-  ('a1000000-a100-a100-a100-a10000000006', '00000000-0000-0000-0000-000000000004', 'e0000000-e000-e000-e000-e00000000002', 'selected'),
-  ('a1000000-a100-a100-a100-a10000000007', '00000000-0000-0000-0000-000000000003', 'e0000000-e000-e000-e000-e00000000002', 'in_progress'),
-  ('a1000000-a100-a100-a100-a10000000008', '00000000-0000-0000-0000-000000000005', 'e0000000-e000-e000-e000-e00000000004', 'selected')
-ON CONFLICT DO NOTHING;
+  ('a1000000-a100-a100-a100-a10000000001', '00000000-0000-0000-0000-000000000001', 'e0000000-e000-e000-e000-e00000000001', 'applied'),
+  ('a1000000-a100-a100-a100-a10000000002', '00000000-0000-0000-0000-000000000001', 'e0000000-e000-e000-e000-e00000000002', 'applied'),
+  ('a1000000-a100-a100-a100-a10000000003', '00000000-0000-0000-0000-000000000002', 'e0000000-e000-e000-e000-e00000000003', 'applied'),
+  ('a1000000-a100-a100-a100-a10000000004', '00000000-0000-0000-0000-000000000002', 'e0000000-e000-e000-e000-e00000000001', 'applied'),
+  ('a1000000-a100-a100-a100-a10000000005', '00000000-0000-0000-0000-000000000003', 'e0000000-e000-e000-e000-e00000000001', 'applied'),
+  ('a1000000-a100-a100-a100-a10000000006', '00000000-0000-0000-0000-000000000004', 'e0000000-e000-e000-e000-e00000000002', 'applied'),
+  ('a1000000-a100-a100-a100-a10000000007', '00000000-0000-0000-0000-000000000003', 'e0000000-e000-e000-e000-e00000000002', 'applied');
+
+UPDATE applications SET status='selected' WHERE id IN ('a1000000-a100-a100-a100-a10000000001',
+  'a1000000-a100-a100-a100-a10000000002','a1000000-a100-a100-a100-a10000000003',
+  'a1000000-a100-a100-a100-a10000000004','a1000000-a100-a100-a100-a10000000005',
+  'a1000000-a100-a100-a100-a10000000006');
+UPDATE applications SET status='in_progress' WHERE id='a1000000-a100-a100-a100-a10000000007';
 
 -- Offers
 INSERT INTO offers (id, application_id, status, annual_ctc_minor, currency) VALUES
