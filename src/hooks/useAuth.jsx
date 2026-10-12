@@ -14,7 +14,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!isSupabaseConfigured()) {
       setState({ session: null, profile: null, loading: false, error: new Error(
-        'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+        'Supabase is not configured. Add the real VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY) to .env.local, then restart npm run dev.',
       ) });
       return undefined;
     }
