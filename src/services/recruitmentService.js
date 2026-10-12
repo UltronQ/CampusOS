@@ -38,7 +38,22 @@ export async function listDrives() {
 }
 
 /**
- * @param {{company_id:string, title:string, start_date:string, status?:string}} drive
+ * Read-only student list. Eligibility and caller ownership are enforced by RLS
+ * in migration 00003; no student ID or role is accepted from the UI.
+ * @returns {Promise<object[]>}
+ */
+export async function listStudentDrives() {
+  const { data, error } = await getSupabase()
+    .from('drives')
+    .select('*, companies(name), drive_departments(department_id, departments(code))')
+    .in('status', ['published', 'completed'])
+    .order('start_date', { ascending: false });
+  if (error) throw new Error(error.message || 'Could not load recruitment drives.');
+  return data ?? [];
+}
+
+/**
+ * @param {{company_id:string, title:string, start_date:string, status?:string, eligible_graduation_years?:number[], min_cgpa?:number|null, max_backlogs?:number|null, application_deadline?:string|null}} drive Department restrictions are separate drive_departments rows.
  * @returns {Promise<object>}
  */
 export async function createDrive(drive) {

@@ -29,6 +29,7 @@ export const INCHARGE_NAV = [
 
 export const STUDENT_NAV = [
   { to: '/student/dashboard', label: 'My Dashboard', icon: '🏠' },
+  { to: '/student/drives', label: 'Recruitment Drives', icon: '📅' },
   { to: '/student/applications', label: 'My Applications', icon: '🧾' },
   { to: '/student/offers', label: 'My Offers', icon: '💼' },
   { to: '/student/clearance', label: 'My Clearance', icon: '✅' },
