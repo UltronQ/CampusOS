@@ -1,93 +1,15 @@
 import { getSupabase } from '../lib/supabaseClient';
+import { createClearanceService } from './clearanceBackend.js';
 
-/**
- * Departmental no-dues checklist and clearance persistence (Member 2).
- *
- * Rules enforced in the database, not only here:
- *  - Only the placement in-charge may approve (RLS + approved_by/approved_at check).
- *  - A student can never approve their own clearance (RLS blocks student writes).
- *  - A cleared/not_applicable row must carry approver evidence (table CHECK).
- */
-
-/**
- * @param {string} departmentId
- * @returns {Promise<object[]>} Checklist template rows for a department.
- */
-export async function listClearanceItemsByDepartment(departmentId) {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from('clearance_items')
-    .select('*')
-    .eq('department_id', departmentId)
-    .order('created_at');
-  if (error) throw error;
-  return data || [];
-}
-
-/**
- * @param {{department_id:string, name:string, is_mandatory?:boolean, is_active?:boolean}} item
- * @returns {Promise<object>}
- */
-export async function createClearanceItem(item) {
-  const supabase = getSupabase();
-  const { data, error } = await supabase.from('clearance_items').insert(item).select().single();
-  if (error) throw error;
-  return data;
-}
-
-/**
- * @param {string} studentId
- * @returns {Promise<object[]>} The student's decisions joined with their items.
- */
-export async function getStudentClearances(studentId) {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from('student_clearances')
-    .select('*, clearance_items(*)')
-    .eq('student_id', studentId)
-    .order('created_at');
-  if (error) throw error;
-  return data || [];
-}
-
-/**
- * Approve (or mark not applicable) a single clearance item as the in-charge.
- * @param {string} studentClearanceId
- * @param {string} approverId Profiles row id of the approving in-charge.
- * @param {'cleared'|'not_applicable'} status
- * @returns {Promise<object>}
- */
-export async function approveClearance(studentClearanceId, approverId, status) {
-  if (status !== 'cleared' && status !== 'not_applicable') {
-    throw new Error('Invalid approval status: expected cleared or not_applicable.');
-  }
-  if (!approverId) {
-    throw new Error('Approval requires the approving in-charge profile id.');
-  }
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from('student_clearances')
-    .update({ status, approved_by: approverId, approved_at: new Date().toISOString() })
-    .eq('id', studentClearanceId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-/**
- * Revert a decision to pending and clear the approval evidence.
- * @param {string} studentClearanceId
- * @returns {Promise<object>}
- */
-export async function markClearancePending(studentClearanceId) {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from('student_clearances')
-    .update({ status: 'pending', approved_by: null, approved_at: null })
-    .eq('id', studentClearanceId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
+// RLS, triggers and RPCs enforce authorization and business rules.
+export const listClearanceItemsByDepartment = (...args) => createClearanceService(getSupabase()).listClearanceItemsByDepartment(...args);
+export const createClearanceItem = (...args) => createClearanceService(getSupabase()).createClearanceItem(...args);
+export const updateClearanceItem = (...args) => createClearanceService(getSupabase()).updateClearanceItem(...args);
+export const deleteClearanceItem = (...args) => createClearanceService(getSupabase()).deleteClearanceItem(...args);
+export const initializeStudentClearances = (...args) => createClearanceService(getSupabase()).initializeStudentClearances(...args);
+export const getStudentClearances = (...args) => createClearanceService(getSupabase()).getStudentClearances(...args);
+export const setClearanceStatus = (...args) => createClearanceService(getSupabase()).setClearanceStatus(...args);
+export const approveClearance = (...args) => createClearanceService(getSupabase()).approveClearance(...args);
+export const markClearancePending = (...args) => createClearanceService(getSupabase()).markClearancePending(...args);
+export const getStudentNoDuesStatement = (...args) => createClearanceService(getSupabase()).getStudentNoDuesStatement(...args);
+export const getNoDuesProgress = (...args) => createClearanceService(getSupabase()).getNoDuesProgress(...args);
