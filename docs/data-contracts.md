@@ -1,6 +1,6 @@
 # M3-1 data contracts and integration agreement
 
-Status: proposed v1. No Member 2 schema or Problem Statement PDF exists in this checkout. Member 2 must confirm the mapping and enums before service implementation; any PDF-specific rule takes priority. No database service or end-to-end feature is claimed complete here.
+Status: backend integration v1.1.0. Member 2's schema, secure services, import commit and filtered report-record RPCs are implemented and tested. See [backend-integration-handoff.md](backend-integration-handoff.md) for verified consumer boundaries and remaining Member 1/3 work. Human contract acknowledgement is pending. No Problem Statement PDF is available in this checkout.
 
 ## Files and ownership
 
@@ -35,6 +35,13 @@ All properties use snake_case matching proposed DB columns. IDs are opaque strin
 Member 2 may use existing names/enums if provided later: adapt in the Member 3 data boundary, keep the documented DTO stable, and record the mapping. Do not create competing migrations. In-charge must read authorized records and write through RLS/trusted functions; students read only their own records and published results. No student permission to change clearance decisions, offers or stage results. Aggregate endpoints and export queries must enforce the same authorization, not accept an actor/role from the browser. SECURITY DEFINER functions, if used, must explicitly check caller rights and set a safe search_path.
 
 ## Import validation and commit rules
+
+Member 2 implementation is `src/services/studentService.js:commitStudentImport`.
+The server revalidates normalized JSON; Member 3 still owns CSV/XLSX file, header,
+formula and cell-type validation. Database limits are 10,000 rows and graduation
+years 1901–2099; preview configuration may be stricter. A forged preview department
+ID is ignored and department_code is resolved server-side. Importing does not
+create Auth accounts or assume a zero backlog count.
 
 v1 is insert-only and atomic. CSV UTF-8 (BOM accepted) and XLSX are supported; use the first nonempty sheet and report its name, reject additional nonempty sheets to avoid silent omissions. Header names are exact IMPORT_HEADERS after trimming BOM/whitespace; unknown or duplicate headers are errors. First five fields are required; cgpa/phone headers are optional. Ignore wholly blank rows, preserve physical row numbers, and reject a header-only file.
 
@@ -71,6 +78,12 @@ Cohort filtering matches placement cohort filters. For each student find all act
 mandatory_items counts student-item pairs (not template definitions) partitioned into cleared, not_applicable, pending, missing. cleared_students+pending_students+not_configured_students=total_students. clearance_rate uses cleared/total with the same rate rounding. by_department partitions the cohort and sorts like placement analytics.
 
 ## Reports and Member 1 signatures
+
+Backend query implementation: `src/services/reportService.js:queryReportRecords`.
+This returns typed current records from one RLS-scoped snapshot for the three
+report kinds; Member 3 still owns `exportReport` and serialization. Use shared
+`ReportRecordsInput/ReportRecordsOutput` types. Workflow report rows use
+`incomplete` and include `mandatory_rejected`; map legacy analytics buckets explicitly.
 
 Member 1 will import the named implementation functions from the planned modules and supply contracts.js DTOs. Await validateStudentFile -> render errors/preview -> invoke Member 2 commitStudentImport only when can_commit. Filters are controlled arrays and nullable dates; do not use labels as IDs. Await analytics and render supplied numbers; do not recompute placed_students from offers in the UI. Async service failures reject with a DataFeatureError-shaped error; import validation failures are returned as validation results. Clear stale success state on failure.
 

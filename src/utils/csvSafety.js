@@ -4,10 +4,11 @@
  */
 export function sanitizeCsvCell(value) {
   if (value === null || value === undefined) return ''
+  // Numeric/boolean inputs remain typed values rather than formula-like text.
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
   const s = String(value)
   if (!s) return ''
-  const first = s[0]
-  if (first === '=' || first === '+' || first === '-' || first === '@' || first === '\t' || first === '\r') {
+  if (/^\s*[=+\-@]/u.test(s) || /^[ \f\v]*[\t\r]/u.test(s)) {
     return "'" + s
   }
   return s

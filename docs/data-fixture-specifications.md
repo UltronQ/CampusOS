@@ -2,6 +2,13 @@
 
 Fixture source: src/tests/fixtures/data-contracts.fixture.js. These are synthetic records, not application dashboard data. Expected objects omit snapshot_at, filters and contract_version; implementations add those metadata fields. Never use these fixtures as a production service fallback.
 
+M2-5 executable database seed is `supabase/seed/seed.sql`. Its valid UUIDs and
+lawful lifecycle writes preserve the expected totals, but omit the legacy draft
+application/offer that new backend guards prohibit (seven applications/offers
+instead of eight). It adds two student Auth links and three stages/results.
+Workflow statements/reports use `incomplete` where this legacy analytics fixture
+uses `pending`. See `docs/backend-integration-handoff.md` for reproducible checks.
+
 ## Base calculations
 
 Unfiltered placement: 5 students, 2 distinct placed, 3 unplaced, 40% placement rate, 5 non-withdrawn applications, 3 successful offers, 1 student with multiple offers. Only o1/o2/o6 qualify. Salary count=2, min=10,000,000 paise, max=20,000,000, mean/median=15,000,000. Null salary on o6 does not remove s4 from placement counts. Department expected objects are in the fixture.

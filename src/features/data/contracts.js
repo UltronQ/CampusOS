@@ -4,7 +4,8 @@
  * Records and authorization come from Supabase; never trust a client role filter.
  * Money is integer minor units (INR paise), never floating-point currency.
  */
-export const DATA_CONTRACT_VERSION = '1.0.0';
+export const DATA_CONTRACT_VERSION = '1.1.0';
+export const REPORT_KINDS = Object.freeze(['placement_summary', 'placement_offers', 'no_dues_statement']);
 export const USER_ROLES = Object.freeze(['placement_incharge', 'student']);
 export const IMPORT_HEADERS = Object.freeze([
   'student_number', 'full_name', 'email', 'department_code',
@@ -166,6 +167,9 @@ export const NO_DUES_OVERALL_STATUSES = Object.freeze(['cleared', 'incomplete', 
 /** @typedef {(file:File, context:ImportValidationContext) => Promise<ImportValidationResult>} ValidateStudentFile */
 /** @typedef {(validation:ImportValidationResult, context:ImportValidationContext) => ImportPreviewResult} BuildImportPreview */
 /** @typedef {(preview:ImportPreviewResult) => Promise<ImportCommitResult>} CommitStudentImport */
+/** @typedef {{kind:'placement_summary'|'placement_offers'|'no_dues_statement', filters?:PlacementAnalyticsFilters|NoDuesAnalyticsFilters, student_ids?:ID[], limit?:number}} ReportRecordsInput */
+/** @typedef {{contract_version:string, snapshot_at:string, kind:string, filters:PlacementAnalyticsFilters|NoDuesAnalyticsFilters, student_ids:ID[], row_count:number, rows:Record<string,unknown>[]}} ReportRecordsOutput */
+/** @typedef {(input:ReportRecordsInput) => Promise<ReportRecordsOutput>} QueryReportRecords */
 /** @typedef {(filters:PlacementAnalyticsFilters) => Promise<PlacementAnalyticsOutput>} GetPlacementAnalytics */
 /** @typedef {(filters:NoDuesAnalyticsFilters) => Promise<NoDuesAnalyticsOutput>} GetNoDuesAnalytics */
 /** @typedef {(input:ReportExportInput) => Promise<ReportExportOutput>} ExportReport */
