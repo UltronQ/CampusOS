@@ -27,9 +27,12 @@ For a fresh development database, run each SQL file in the Supabase SQL Editor i
 4. `supabase/migrations/20251012000004_clearance_remarks.sql`
 5. `supabase/migrations/20251012000004_student_services.sql`
 6. `supabase/migrations/20261012000003_recruitment.sql`
-7. `supabase/migrations/20261012000004_placement_analytics.sql`
+7. `supabase/migrations/20261012000004_clearance_status.sql`
+8. `supabase/migrations/20261012000004_placement_analytics.sql`
+9. `supabase/migrations/20261012000005_no_dues_workflow.sql`
+10. `supabase/migrations/20261012000008_m3_report_snapshot.sql`
 
-For an existing project, Member 2 should first check which migrations are already applied and run only missing files; these schema migrations are not intended for repeated execution. There are two existing files sharing version `20251012000004`, so the SQL Editor sequence above avoids treating them as a single CLI migration. Coordinate unique versions/history with Member 2 before using automated `supabase db push`; do not rename previously applied migrations blindly. Do not reset a shared database to configure a local preview.
+For an existing project, Member 2 should first check which migrations are already applied and run only missing files; these schema migrations are not intended for repeated execution. There are files sharing versions `20251012000004` and `20261012000004`, so the SQL Editor sequence above avoids treating each pair as a single CLI migration. Coordinate unique versions/history with Member 2 before using automated `supabase db push`; do not rename previously applied migrations blindly. Do not reset a shared database to configure a local preview.
 
 ## 4. Create real demo logins and roles
 

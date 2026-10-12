@@ -33,6 +33,7 @@ export const STUDENT_NAV = [
   { to: '/student/applications', label: 'My Applications', icon: '🧾' },
   { to: '/student/offers', label: 'My Offers', icon: '💼' },
   { to: '/student/clearance', label: 'My Clearance', icon: '✅' },
+  { to: '/student/reports', label: 'My Reports', icon: '📤' },
 ];
 
 export function navForRole(role) {

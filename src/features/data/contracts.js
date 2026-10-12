@@ -4,7 +4,7 @@
  * Records and authorization come from Supabase; never trust a client role filter.
  * Money is integer minor units (INR paise), never floating-point currency.
  */
-export const DATA_CONTRACT_VERSION = '1.3.0';
+export const DATA_CONTRACT_VERSION = '1.4.0';
 export const USER_ROLES = Object.freeze(['placement_incharge', 'student']);
 export const IMPORT_HEADERS = Object.freeze([
   'student_number', 'full_name', 'email', 'department_code',
@@ -158,7 +158,7 @@ export const NO_DUES_OVERALL_STATUSES = Object.freeze(['cleared', 'incomplete', 
  * Statements always contain overall_status calculated from all applicable
  * mandatory items, even when displayed item columns are narrowed.
  * @typedef {Object} ReportExportInput
- * @property {'placement_summary'|'placement_offers'|'no_dues_statement'} kind
+ * @property {'department_placement'|'company_outcomes'|'student_placement_history'|'unplaced_students'|'pending_no_dues'|'no_dues_statement'|'batch_placement_summary'|'placement_summary'|'placement_offers'} kind
  * @property {'csv'|'xlsx'} format
  * @property {PlacementAnalyticsFilters|NoDuesAnalyticsFilters} filters Validated against kind.
  * @property {ID[]} student_ids Optional narrowing for report rows; empty means all authorized.
@@ -174,10 +174,12 @@ export const NO_DUES_OVERALL_STATUSES = Object.freeze(['cleared', 'incomplete', 
  * @property {'text/csv;charset=utf-8'|'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'} mime_type
  * @property {Blob} blob
  * @property {number} row_count
+ * @property {number} report_row_count Primary report records; excludes XLSX checklist/metadata sheet rows.
  * @property {string[]} columns Actual ordered output columns.
  * @property {{name:string, row_count:number}[]} sheets CSV = one sheet named Report.
  * @property {string[]} warnings
  */
+/** @typedef {{contract_version:string, title:string, kind:ReportExportInput['kind'], snapshot_at:string, filters:PlacementAnalyticsFilters|NoDuesAnalyticsFilters, student_ids:ID[], filter_summary:string[], columns:{key:string,heading:string}[], rows:Object[], row_count:number, item_rows:Object[], item_columns:{key:string,heading:string}[], placement_denominator:'cohort_students'|null}} ReportResult */
 /** @typedef {{code:'INVALID_INPUT'|'UNAUTHORIZED'|'FORBIDDEN'|'NOT_FOUND'|'CONFLICT'|'DATABASE_ERROR'|'EXPORT_LIMIT', message:string, backend_code?:string|null, fields?:ValidationIssue[]}} DataFeatureError */
 
 // Integration signatures (implementations belong in the modules documented below):
@@ -187,3 +189,4 @@ export const NO_DUES_OVERALL_STATUSES = Object.freeze(['cleared', 'incomplete', 
 /** @typedef {(filters:PlacementAnalyticsFilters) => Promise<PlacementAnalyticsOutput>} GetPlacementAnalytics */
 /** @typedef {(filters:NoDuesAnalyticsFilters) => Promise<NoDuesAnalyticsOutput>} GetNoDuesAnalytics */
 /** @typedef {(input:ReportExportInput) => Promise<ReportExportOutput>} ExportReport */
+/** @typedef {(input:ReportExportInput) => Promise<ReportResult>} GetReport */

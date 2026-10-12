@@ -65,6 +65,7 @@ export default function AppRoutes() {
         <Route path="/student/applications" element={<StudentApplications />} />
         <Route path="/student/offers" element={<StudentOffers />} />
         <Route path="/student/clearance" element={<StudentClearance />} />
+        <Route path="/student/reports" element={<Reports personal />} />
       </Route>
 
       <Route path="*" element={<NotFound />} />

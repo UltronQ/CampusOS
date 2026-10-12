@@ -1,12 +1,12 @@
 # M3-1 data contracts and integration agreement
 
-Status: v1.3 includes M3-3 placement analytics alongside M2-2 persistence and M3-2 imports. The placement percentage denominator is now the selected student cohort; registration, eligibility and participation are separate metrics. See [M3-3](m3-3-placement-analytics.md) for implemented rules and [Supabase setup](supabase-setup.md) for configuration. The Problem Statement PDF has not been supplied; any PDF-specific rule takes priority. No-dues analytics and report exports remain later Member 3 implementations.
+Status: v1.4 includes M3-4 reports/CSV/XLSX exports, M3-3 placement analytics, M2-4 server clearance statements and M3-2 imports. Placement percentage uses the selected student cohort; registration, eligibility and participation are separate metrics. See [M3-4](m3-4-reports-and-exports.md), [M3-3](m3-3-placement-analytics.md) and [Supabase setup](supabase-setup.md). The Problem Statement PDF has not been supplied; any PDF-specific rule takes priority. Member 3's separate no-dues analytics module remains a later assignment; reports already reuse Member 2's trusted no-dues statements.
 
 ## Files and ownership
 
 Created now (Member 3): src/features/data/contracts.js, docs/data-contracts.md, docs/data-fixture-specifications.md, src/tests/fixtures/data-contracts.fixture.js. No other member files are changed. Contracts use JSDoc in ordinary JavaScript; consumers can use import('./contracts.js').TypeName in JSDoc. The exported constants are real JavaScript; function typedefs describe future implementations, not callable stubs.
 
-Planned Member 3 modules:
+Member 3 module entry points (imports, placement analytics and reports are implemented):
 - src/features/import/studentImport.js: validateStudentFile(file, context), buildImportPreview(validation, context).
 - src/features/analytics/placementAnalytics.js: getPlacementAnalytics(filters).
 - src/features/analytics/noDuesAnalytics.js: getNoDuesAnalytics(filters).

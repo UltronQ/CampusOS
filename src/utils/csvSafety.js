@@ -4,10 +4,10 @@
  */
 export function sanitizeCsvCell(value) {
   if (value === null || value === undefined) return ''
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
   const s = String(value)
   if (!s) return ''
-  const first = s[0]
-  if (first === '=' || first === '+' || first === '-' || first === '@' || first === '\t' || first === '\r') {
+  if (/^\s*[=+\-@\t\r]/u.test(s)) {
     return "'" + s
   }
   return s

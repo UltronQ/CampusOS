@@ -6,6 +6,7 @@ Run `npm ci`, configure `.env.local` using [Supabase setup](docs/supabase-setup.
 
 - [Student CSV/XLSX import (M3-2)](docs/m3-2-student-import.md)
 - [Live placement analytics and metric definitions (M3-3)](docs/m3-3-placement-analytics.md)
+- [Authorized reports, CSV/Excel exports and print controls (M3-4)](docs/m3-4-reports-and-exports.md)
 - [Shared JavaScript contracts](docs/data-contracts.md)
 
 Checks: `npm test`, `node --test tests/*.test.js`, `npm run test:import-ui`, `npm run build`.

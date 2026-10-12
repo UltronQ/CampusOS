@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 import { chromium } from 'playwright';
 import * as XLSX from 'xlsx';
+import Papa from 'papaparse';
 import { createTestDatabase, readProjectFile, withUser } from '../helpers/database.js';
 
 // Test-only Auth transport fixture. Production authentication is unchanged.
@@ -57,6 +58,9 @@ try {
       else if (url.pathname === '/rest/v1/rpc/get_placement_analytics_snapshot') {
         snapshots++;
         data = (await authorized('SELECT public.get_placement_analytics_snapshot() AS result')).rows[0].result;
+      } else if (url.pathname === '/rest/v1/rpc/get_campusos_report_snapshot') {
+        const args=request.postDataJSON();
+        data=(await authorized('SELECT public.get_campusos_report_snapshot($1) AS result',[args.p_kind])).rows[0].result;
       } else if (url.pathname === '/rest/v1/companies') data = (await authorized('SELECT * FROM companies ORDER BY name')).rows;
       else if (url.pathname === '/rest/v1/departments') data = (await authorized('SELECT * FROM departments ORDER BY code')).rows;
       else if (url.pathname === '/rest/v1/students') data = (await authorized('SELECT s.*, jsonb_build_object(\'code\',d.code) AS departments FROM students s JOIN departments d ON d.id=s.department_id')).rows;
@@ -122,6 +126,40 @@ try {
   assert.ok(overflow.scroll <= overflow.width + 1, JSON.stringify(overflow));
   await page.setViewportSize({ width: 1440, height: 1000 });
   console.log('PASS: live dashboard uses stored analytics, all required filters, manual/focus refresh and mobile layout');
+  await page.goto(`http://127.0.0.1:${port}/incharge/reports`);
+  await page.getByRole('heading',{name:'Department-wise Placement Statistics',exact:true}).waitFor();
+  await page.getByLabel('Report type',{exact:true}).selectOption('student_placement_history');
+  await page.getByRole('heading',{name:'Student-wise Placement History',exact:true}).waitFor();
+  await page.getByRole('group',{name:'Department filters'}).getByLabel('CSE',{exact:true}).locator('..').click();
+  await page.getByText(/· 3 record\(s\)/).waitFor();
+  const csvDownload=page.waitForEvent('download');await page.getByRole('button',{name:'Export CSV',exact:true}).click();
+  const csvFile=await csvDownload;
+  const exported=Papa.parse(await readFile(await csvFile.path(),'utf8'),{header:true,skipEmptyLines:true}).data;
+  assert.deepEqual(exported.map((r)=>r['Roll Number']),['001','002','003']);
+  assert.equal(exported[0]['Valid Offer Count'],'2');assert.equal(exported[0]['Placed'],'true');
+  await page.getByLabel('Report type',{exact:true}).selectOption('no_dues_statement');
+  await page.getByRole('heading',{name:'Student-wise No-Dues Statement',exact:true}).waitFor();
+  await page.getByLabel('Student',{exact:true}).selectOption('00000000-0000-0000-0000-000000000001');
+  await page.getByText(/· 1 record\(s\)/).waitFor();
+  const excelDownload=page.waitForEvent('download');await page.getByRole('button',{name:'Export Excel',exact:true}).click();
+  const excelFile=await excelDownload;
+  const reportBook=XLSX.read(await readFile(await excelFile.path()),{type:'buffer'});
+  assert.equal(reportBook.Sheets.Report.A2.v,'001');assert.equal(reportBook.Sheets.Report.A2.t,'s');
+  assert.equal(XLSX.utils.sheet_to_json(reportBook.Sheets.Report)[0]['Overall No-Dues Status'],'cleared');
+  assert.equal(XLSX.utils.sheet_to_json(reportBook.Sheets['Checklist items']).length,3);
+  await page.evaluate(()=>{
+    const append=Element.prototype.append;
+    Element.prototype.append=function(...nodes){append.apply(this,nodes);for(const node of nodes){if(node?.tagName==='IFRAME')node.contentWindow.print=()=>{window.__printedReport=node.contentDocument.body.innerText;};}};
+  });
+  await page.getByRole('button',{name:'Print report',exact:true}).click();
+  await page.waitForFunction(()=>window.__printedReport?.includes('No-dues checklist details'));
+  assert.ok(await page.evaluate(()=>window.__printedReport.includes('Library') && window.__printedReport.includes('Database snapshot (UTC)')));
+  await page.screenshot({path:join(tmpdir(),'campusos-reports-desktop.png'),fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:join(tmpdir(),'campusos-reports-mobile.png'),fullPage:true});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
+  await page.setViewportSize({width:1440,height:1000});
+  console.log('PASS: filtered placement CSV, no-dues Excel/checklists, real print document and responsive report UI');
   await page.goto(`http://127.0.0.1:${port}/incharge/import`);
   await page.getByRole('heading', { name: 'Import Students', exact: true }).waitFor();
 
