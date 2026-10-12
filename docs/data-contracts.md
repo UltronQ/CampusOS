@@ -32,7 +32,7 @@ All properties use snake_case matching proposed DB columns. IDs are opaque strin
 - application_stage_results: id, application_id, stage_id, status = pending | passed | failed, published_at (nullable). Student reads only published results.
 - offers: id, application_id, status = offered | accepted | declined | revoked, annual_ctc_minor (nullable nonnegative integer), currency = INR. Multiple offers per student and application are supported; do not add a unique student constraint.
 - clearance_items: id, department_id (student cohort department), name, is_mandatory, is_active. For v1 all active department items apply to every student in that department. More complex applicability needs a schema agreement.
-- student_clearances: id, student_id, clearance_item_id, status = pending | cleared | not_applicable, approved_by (nullable profile ID), approved_at (nullable server timestamp); unique(student_id, clearance_item_id). Approval fields required for cleared/not_applicable. Only in-charge approves either state.
+- student_clearances: id, student_id, clearance_item_id, status = pending | cleared | not_applicable | rejected, remarks, pending_requirements, updated_by, updated_at, approved_by (nullable profile ID), approved_at (nullable server timestamp); unique(student_id, clearance_item_id). Approval fields required for cleared/not_applicable and generated server-side. Only in-charge changes decisions. `rejected` displays as Rejected / Further Action Required.
 
 Adapt future schema changes at the Member 3 data boundary and record any versioned DTO change. Do not create competing migrations. In-charge must read authorized records and write through RLS/trusted functions; students read only their own records and published results. No student permission to change clearance decisions, offers or stage results. Aggregate endpoints and export queries must enforce the same authorization, not accept an actor/role from the browser. SECURITY DEFINER functions must explicitly check caller rights and set a safe search_path. listStudentDrives() accepts no student ID; database RLS checks the caller's linked student record, department, graduation year, CGPA and backlog thresholds. Draft/cancelled drives are hidden from that route.
 
@@ -63,6 +63,12 @@ Read a single authorized database snapshot (prefer one SQL query/RPC). Do not fe
 Use integer/rational arithmetic and explicit half-up rounding for percentages and money, with safe-integer bounds checked. For an empty cohort, all counts are zero and rates/statistics are null as specified. Return failures rather than partial/stale successful counts. Future policy changes to successful offer statuses require a versioned contract change.
 
 ## Deterministic no-dues calculations
+
+M2-4 implements secure statement/progress RPCs and the reusable database calculation
+in [no-dues-backend.md](no-dues-backend.md). Workflow overall status is `incomplete`
+for mandatory pending, rejected or missing items. The legacy analytics DTO below
+maps that bucket to `pending`; rejected decisions must also count as unresolved.
+The workflow endpoints additionally expose `mandatory_rejected` and batch progress.
 
 Cohort filtering matches placement cohort filters. For each student find all active mandatory items applicable through their department. Missing student_clearances rows count as missing and prevent clearance. Overall cleared requires at least one active mandatory item AND every such item explicitly cleared or not_applicable with in-charge approval evidence. Otherwise pending. If no mandatory items are configured, return not_configured, never Cleared. Optional items and inactive items do not block. An overall statement must use the full applicable mandatory set regardless of which items are displayed. Duplicate decisions are prevented by DB uniqueness; mismatched department decisions and terminal decisions without approval evidence are integrity errors.
 

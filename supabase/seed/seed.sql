@@ -11,8 +11,9 @@ DECLARE item record;
 BEGIN
   FOR item IN SELECT tgrelid::regclass AS relation, tgname FROM pg_trigger
     WHERE NOT tgisinternal AND tgrelid IN ('public.drives'::regclass,
-      'public.applications'::regclass, 'public.offers'::regclass)
-      AND tgname IN ('guard_drive', 'guard_application', 'guard_offer') LOOP
+      'public.applications'::regclass, 'public.offers'::regclass,
+      'public.clearance_items'::regclass, 'public.student_clearances'::regclass)
+      AND tgname IN ('guard_drive', 'guard_application', 'guard_offer', 'guard_clearance_item', 'guard_student_clearance') LOOP
     EXECUTE format('ALTER TABLE %s DISABLE TRIGGER %I', item.relation, item.tgname);
   END LOOP;
 END;
@@ -108,8 +109,9 @@ DECLARE item record;
 BEGIN
   FOR item IN SELECT tgrelid::regclass AS relation, tgname FROM pg_trigger
     WHERE NOT tgisinternal AND tgrelid IN ('public.drives'::regclass,
-      'public.applications'::regclass, 'public.offers'::regclass)
-      AND tgname IN ('guard_drive', 'guard_application', 'guard_offer') LOOP
+      'public.applications'::regclass, 'public.offers'::regclass,
+      'public.clearance_items'::regclass, 'public.student_clearances'::regclass)
+      AND tgname IN ('guard_drive', 'guard_application', 'guard_offer', 'guard_clearance_item', 'guard_student_clearance') LOOP
     EXECUTE format('ALTER TABLE %s ENABLE TRIGGER %I', item.relation, item.tgname);
   END LOOP;
 END;
