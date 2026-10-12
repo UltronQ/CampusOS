@@ -30,7 +30,10 @@ For a fresh development database, run each SQL file in the Supabase SQL Editor i
 7. `supabase/migrations/20261012000004_clearance_status.sql`
 8. `supabase/migrations/20261012000004_placement_analytics.sql`
 9. `supabase/migrations/20261012000005_no_dues_workflow.sql`
-10. `supabase/migrations/20261012000008_m3_report_snapshot.sql`
+10. `supabase/migrations/20261012000006_backend_integrity.sql`
+11. `supabase/migrations/20261012000007_report_queries.sql`
+12. `supabase/migrations/20261012000008_m3_report_snapshot.sql`
+13. `supabase/migrations/20261012000009_import_contract_alignment.sql`
 
 For an existing project, Member 2 should first check which migrations are already applied and run only missing files; these schema migrations are not intended for repeated execution. There are files sharing versions `20251012000004` and `20261012000004`, so the SQL Editor sequence above avoids treating each pair as a single CLI migration. Coordinate unique versions/history with Member 2 before using automated `supabase db push`; do not rename previously applied migrations blindly. Do not reset a shared database to configure a local preview.
 

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { readSupabaseConfig } from './supabaseConfig.js';
 
 /**
  * Central Supabase browser client.
@@ -8,24 +9,20 @@ import { createClient } from '@supabase/supabase-js';
  * never by this client or by UI logic.
  */
 
-const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env?.VITE_SUPABASE_ANON_KEY;
+const config = readSupabaseConfig(import.meta.env);
 
 let client = null;
 
 export function isSupabaseConfigured() {
-  return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+  return config.configured;
 }
 
 export function getSupabase() {
   if (!isSupabaseConfigured()) {
-    throw new Error(
-      'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY) ' +
-        '(see .env.local, copied from .env.example) and restart the dev server.',
-    );
+    throw new Error(config.message);
   }
   if (!client) {
-    client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    client = createClient(config.url, config.key);
   }
   return client;
 }
