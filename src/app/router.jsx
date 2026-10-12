@@ -14,6 +14,7 @@ import Analytics from '../pages/incharge/Analytics';
 import NoDues from '../pages/incharge/NoDues';
 import Reports from '../pages/incharge/Reports';
 import StudentDashboard from '../pages/student/Dashboard';
+import StudentDrives from '../pages/student/Drives';
 import StudentApplications from '../pages/student/Applications';
 import StudentOffers from '../pages/student/Offers';
 import StudentClearance from '../pages/student/Clearance';
@@ -60,6 +61,7 @@ export default function AppRoutes() {
         }
       >
         <Route path="/student/dashboard" element={<StudentDashboard />} />
+        <Route path="/student/drives" element={<StudentDrives />} />
         <Route path="/student/applications" element={<StudentApplications />} />
         <Route path="/student/offers" element={<StudentOffers />} />
         <Route path="/student/clearance" element={<StudentClearance />} />
