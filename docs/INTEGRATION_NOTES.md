@@ -13,8 +13,14 @@
 - `VITE_SUPABASE_URL` - Supabase project URL
 - `VITE_SUPABASE_ANON_KEY` - Supabase anon key (never service role)
 
+## Merge resolution with main (M1-1 frontend)
+Member 1's frontend foundation landed on `main` first and created two of the same files. Resolved as follows (no Member 1 API was removed):
+- `src/lib/supabaseClient.js` — kept Member 1's lazy client (`getSupabase()`, `isSupabaseConfigured()`). There is no `supabase` const export; every Member 2 service calls `getSupabase()`.
+- `src/services/authService.js` — one file, two ownership areas: Member 1 keeps `getSession`, `signInWithPassword`, `signOut`, `onAuthStateChange`, `fetchProfile` (used by `src/hooks/useAuth.jsx`); Member 2 added `getCurrentUser`, `getCurrentProfile`, `isPlacementIncharge`, `getStudentRecord` on the same client.
+- Member 2's `studentService.js`, `recruitmentService.js` and `clearanceService.js` were updated to `getSupabase()` so they work against Member 1's client.
+
 ## Services (src/services)
-- `authService.js`: getCurrentUser, getCurrentProfile, isPlacementIncharge, getStudentRecord
+- `authService.js`: shared — Member 1 session boundary plus Member 2 helpers (getCurrentUser, getCurrentProfile, isPlacementIncharge, getStudentRecord)
 - `studentService.js`: listStudents, createStudent, updateStudent, getStudentById
 - `recruitmentService.js`: companies/drives/applications/offers/stages
 - `clearanceService.js`: clearance items, student clearances, approval (in-charge only; enforced by RLS + app checks)

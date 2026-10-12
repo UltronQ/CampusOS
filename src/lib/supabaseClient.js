@@ -1,10 +1,31 @@
+import { createClient } from '@supabase/supabase-js';
+
 /**
- * Supabase client - client-side for app; server contexts should use service role only if needed,
- * but per project rules never expose service-role keys or secrets. 
+ * Central Supabase browser client.
+ * Uses only public project values (URL + anon key) injected by Vite.
+ * The service-role key must never appear in frontend code or env files.
+ * Authorization is enforced by Supabase RLS / trusted backend functions,
+ * never by this client or by UI logic.
  */
-import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '')
+let client = null;
+
+export function isSupabaseConfigured() {
+  return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+}
+
+export function getSupabase() {
+  if (!isSupabaseConfigured()) {
+    throw new Error(
+      'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY ' +
+        '(see .env.local, copied from .env.example) and restart the dev server.',
+    );
+  }
+  if (!client) {
+    client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+  return client;
+}
