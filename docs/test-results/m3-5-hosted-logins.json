@@ -1,0 +1,37 @@
+{
+  "checked_at": "2026-10-12T12:09:12.081Z",
+  "mode": "hosted Supabase Auth",
+  "passed": 0,
+  "failed": 0,
+  "blocked": 4,
+  "results": [
+    {
+      "account": "incharge",
+      "email": "campusos.incharge@example.test",
+      "expected_role": "placement_incharge",
+      "status": "blocked",
+      "reason": "Local demo password is missing; real login was not attempted."
+    },
+    {
+      "account": "student-cse",
+      "email": "campusos.student01@example.test",
+      "expected_role": "student",
+      "status": "blocked",
+      "reason": "Local demo password is missing; real login was not attempted."
+    },
+    {
+      "account": "student-ece",
+      "email": "campusos.student12@example.test",
+      "expected_role": "student",
+      "status": "blocked",
+      "reason": "Local demo password is missing; real login was not attempted."
+    },
+    {
+      "account": "student-me",
+      "email": "campusos.student21@example.test",
+      "expected_role": "student",
+      "status": "blocked",
+      "reason": "Local demo password is missing; real login was not attempted."
+    }
+  ]
+}
