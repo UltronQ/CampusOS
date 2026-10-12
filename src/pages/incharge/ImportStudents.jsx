@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ModulePage from '../../components/layout/ModulePage';
 import DataTable from '../../components/ui/DataTable';
 import StatusBadge from '../../components/ui/StatusBadge';
@@ -61,6 +62,7 @@ function summarize(validation) {
 }
 
 export default function ImportStudents() {
+  const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const [fileName, setFileName] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -334,7 +336,7 @@ export default function ImportStudents() {
             </p>
           ))}
           {commitResult.committed ? (
-            <Button variant="secondary" className="mt-3" onClick={() => window.location.assign('/incharge/students')}>
+            <Button variant="secondary" className="mt-3" onClick={() => navigate('/incharge/students')}>
               View students directory →
             </Button>
           ) : null}
