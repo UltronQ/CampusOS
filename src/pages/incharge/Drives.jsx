@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import ModulePage from '../../components/layout/ModulePage';
 import DataTable from '../../components/ui/DataTable';
 import StatusBadge from '../../components/ui/StatusBadge';
@@ -15,9 +15,6 @@ import {
   DRIVE_STATUS_LABELS,
   DRIVE_STATUS_VALUES,
   DEFAULT_STAGE_PRESET,
-  rupeesToMinor,
-  minorToRupees,
-  formatCtc,
 } from '../../app/placementLabels';
 
 /**
@@ -38,37 +35,34 @@ const EMPTY_FORM = {
   title: '',
   start_date: '',
   application_deadline: '',
-  job_location: '',
-  ctc_rupees: '',
-  criteria: '',
+  min_cgpa: '',
+  max_backlogs: '',
   status: 'draft',
   department_ids: [],
   batch_years: [],
   stage_names: [],
 };
 
-function toFormValues(drive, eligibilityRows) {
+function toFormValues(drive) {
   if (!drive) return { ...EMPTY_FORM, stage_names: [...DEFAULT_STAGE_PRESET] };
-  const rows = eligibilityRows.filter((row) => row.drive_id === drive.id);
   return {
     company_id: drive.company_id ?? '',
     title: drive.title ?? '',
     start_date: drive.start_date ?? '',
-    application_deadline: drive.application_deadline ?? '',
-    job_location: drive.job_location ?? '',
-    ctc_rupees: minorToRupees(drive.annual_ctc_minor) ?? '',
-    criteria: drive.criteria ?? '',
+    application_deadline: drive.application_deadline
+      ? String(drive.application_deadline).slice(0, 10)
+      : '',
+    min_cgpa: drive.min_cgpa ?? '',
+    max_backlogs: drive.max_backlogs ?? '',
     status: drive.status ?? 'draft',
-    department_ids: [...new Set(rows.map((row) => row.department_id))],
-    batch_years: [
-      ...new Set(rows.filter((row) => row.graduation_year !== null).map((row) => row.graduation_year)),
-    ],
+    department_ids: (drive.drive_departments ?? []).map((row) => row.department_id),
+    batch_years: drive.eligible_graduation_years ?? [],
     stage_names: (drive.recruitment_stages ?? []).map((stage) => stage.name),
   };
 }
 
-function DriveForm({ drive, companies, departments, eligibilityRows, busy, onSubmit, onCancel }) {
-  const [values, setValues] = useState(() => toFormValues(drive, eligibilityRows));
+function DriveForm({ drive, companies, departments, busy, onSubmit, onCancel }) {
+  const [values, setValues] = useState(() => toFormValues(drive));
   const [newStage, setNewStage] = useState('');
   const [error, setError] = useState(null);
 
@@ -104,34 +98,30 @@ function DriveForm({ drive, companies, departments, eligibilityRows, busy, onSub
       setError(new Error('Company, drive title and start date are required.'));
       return;
     }
-    const ctcMinor = values.ctc_rupees === '' ? null : rupeesToMinor(values.ctc_rupees);
-    if (values.ctc_rupees !== '' && ctcMinor === null) {
-      setError(new Error('Package must be a non-negative rupee amount.'));
+    const minCgpa = values.min_cgpa === '' ? null : Number(values.min_cgpa);
+    if (minCgpa !== null && (!Number.isFinite(minCgpa) || minCgpa < 0 || minCgpa > 10)) {
+      setError(new Error('Minimum CGPA must be between 0 and 10, or blank.'));
       return;
     }
-    const entries = [];
-    for (const departmentId of values.department_ids) {
-      if (values.batch_years.length === 0) {
-        entries.push({ department_id: departmentId, graduation_year: null });
-      } else {
-        for (const year of values.batch_years) {
-          entries.push({ department_id: departmentId, graduation_year: year });
-        }
-      }
+    const maxBacklogs = values.max_backlogs === '' ? null : Number(values.max_backlogs);
+    if (maxBacklogs !== null && (!Number.isInteger(maxBacklogs) || maxBacklogs < 0)) {
+      setError(new Error('Maximum backlogs must be a non-negative whole number, or blank.'));
+      return;
     }
     onSubmit({
       payload: {
         company_id: values.company_id,
         title: values.title.trim(),
         start_date: values.start_date,
-        application_deadline: values.application_deadline || null,
-        job_location: values.job_location.trim() || null,
-        annual_ctc_minor: ctcMinor,
-        criteria: values.criteria.trim() || null,
+        application_deadline: values.application_deadline
+          ? new Date(values.application_deadline).toISOString()
+          : null,
+        min_cgpa: minCgpa,
+        max_backlogs: maxBacklogs,
         status: values.status,
       },
       stageNames: values.stage_names,
-      eligibility: entries,
+      eligibility: { departmentIds: values.department_ids, graduationYears: values.batch_years },
     });
   }
 
@@ -178,18 +168,21 @@ function DriveForm({ drive, companies, departments, eligibilityRows, busy, onSub
           disabled={busy}
         />
         <FormField
-          label="Job location"
-          value={values.job_location}
-          onChange={(event) => set('job_location', event.target.value)}
-          placeholder="Bengaluru / Remote"
+          label="Minimum CGPA"
+          inputMode="decimal"
+          value={values.min_cgpa}
+          onChange={(event) => set('min_cgpa', event.target.value)}
+          placeholder="e.g. 7.0"
+          hint="Blank = no minimum"
           disabled={busy}
         />
         <FormField
-          label="Package (₹ per annum)"
+          label="Maximum backlogs"
           inputMode="numeric"
-          value={values.ctc_rupees}
-          onChange={(event) => set('ctc_rupees', event.target.value)}
-          placeholder="e.g. 600000"
+          value={values.max_backlogs}
+          onChange={(event) => set('max_backlogs', event.target.value)}
+          placeholder="e.g. 0"
+          hint="Blank = no limit"
           disabled={busy}
         />
         <FormField
@@ -262,15 +255,6 @@ function DriveForm({ drive, companies, departments, eligibilityRows, busy, onSub
             ) : null}
           </div>
         </FormField>
-        <FormField
-          label="Selection criteria"
-          as="textarea"
-          value={values.criteria}
-          onChange={(event) => set('criteria', event.target.value)}
-          placeholder="CGPA ≥ 7.0, no active backlogs, open to all branches…"
-          className="sm:col-span-2"
-          disabled={busy}
-        />
       </div>
 
       <fieldset className="rounded-lg border border-slate-200 p-4">
@@ -347,25 +331,6 @@ export default function Drives() {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
-  const [eligibilityRows, setEligibilityRows] = useState([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!drives.data) return undefined;
-    driveService
-      .listDriveEligibility(drives.data.map((drive) => drive.id))
-      .then((rows) => {
-        if (!cancelled) setEligibilityRows(rows);
-      })
-      .catch(() => {
-        // Eligibility table may not exist yet (migration 0003); form still
-        // works, saving eligibility will surface the migration error.
-        if (!cancelled) setEligibilityRows([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [drives.data]);
 
   const filtered = useMemo(() => {
     if (!drives.data) return [];
@@ -398,15 +363,14 @@ export default function Drives() {
         driveId = created.id;
       }
       await driveService.syncDriveStages(driveId, stageNames, editing?.recruitment_stages ?? []);
-      await driveService.replaceDriveEligibility(driveId, eligibility);
+      await driveService.saveDriveEligibility(driveId, eligibility);
       setFormOpen(false);
       drives.reload();
     } catch (err) {
       setSaveError(
         new Error(
           `${err?.message ?? 'Could not save the drive.'} ` +
-            '(If this mentions an unknown column or table, apply migration ' +
-            '20251012000003_drive_metadata_and_eligibility.sql.)',
+            '(Eligibility columns come from the phase-one migration — confirm it is applied.)',
         ),
       );
     } finally {
@@ -442,15 +406,16 @@ export default function Drives() {
       render: (row) => <span className="text-xs">{row.application_deadline ?? '—'}</span>,
     },
     {
-      key: 'job_location',
-      label: 'Location',
-      render: (row) => <span className="text-xs">{row.job_location ?? '—'}</span>,
-    },
-    {
-      key: 'annual_ctc_minor',
-      label: 'Package',
-      align: 'right',
-      render: (row) => <span className="text-xs">{formatCtc(row.annual_ctc_minor, row.currency)}</span>,
+      key: 'eligibility',
+      label: 'Eligibility',
+      render: (row) => {
+        const depts = (row.drive_departments ?? []).map((d) => d.departments?.code).filter(Boolean);
+        const years = row.eligible_graduation_years ?? [];
+        const parts = [];
+        parts.push(depts.length ? depts.join('/') : 'All depts');
+        parts.push(years.length ? years.join(', ') : 'All years');
+        return <span className="text-xs">{parts.join(' · ')}</span>;
+      },
     },
     {
       key: 'recruitment_stages',
@@ -550,7 +515,6 @@ export default function Drives() {
             drive={editing}
             companies={companies.data}
             departments={departments.data}
-            eligibilityRows={eligibilityRows}
             busy={saving}
             onSubmit={handleSubmit}
             onCancel={() => setFormOpen(false)}

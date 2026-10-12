@@ -60,6 +60,13 @@ export const STAGE_RESULT_LABELS = Object.freeze({
   failed: 'Failed',
 });
 
+/** No-dues overall status labels (M1-4). */
+export const CLEARANCE_OVERALL_LABELS = Object.freeze({
+  cleared: 'Cleared',
+  pending: 'Pending',
+  not_configured: 'Not Configured',
+});
+
 /** ₹ paise helpers (integer minor units, half-up display to whole rupees). */
 export function rupeesToMinor(rupees) {
   const value = Number(String(rupees).replace(/[, ]/g, ''));
