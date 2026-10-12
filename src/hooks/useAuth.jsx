@@ -47,14 +47,20 @@ export function AuthProvider({ children }) {
     await authService.signOut();
     await resolverRef.current?.resolve(null);
   }, []);
+  const signInWithGoogle = useCallback(() => authService.signInWithGoogle(), []);
+  const completeGoogleSignIn = useCallback(async (code) => {
+    const result = await authService.completeGoogleSignIn(code);
+    await resolverRef.current?.resolve(result.session, result.profile);
+    return result;
+  }, []);
   const refreshProfile = useCallback(async () => {
     await resolverRef.current?.resolve(state.session);
   }, [state.session]);
   const value = useMemo(() => {
     const role = state.profile?.role ?? null;
-    return { ...state, user: state.session?.user ?? null, role, signIn, signOut, refreshProfile,
+    return { ...state, user: state.session?.user ?? null, role, signIn, signInWithGoogle, completeGoogleSignIn, signOut, refreshProfile,
       isPlacementIncharge: role === 'placement_incharge', isStudent: role === 'student' };
-  }, [state, signIn, signOut, refreshProfile]);
+  }, [state, signIn, signInWithGoogle, completeGoogleSignIn, signOut, refreshProfile]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

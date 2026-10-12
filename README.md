@@ -15,3 +15,5 @@ Copy the actual Project URL and public publishable key from Supabase's Connect d
 - [Combined PR integration decisions](docs/merged-pr-integration.md)
 
 Checks: `npm test` (both test folders), `npm run test:acceptance`, `npm run test:import-ui`, `npm run build`. The older `supabase/seed/seed.sql` is the five-student regression fixture; the repeatable 30-student demo data, trusted provisioning steps and hosted-readiness status are documented in [M3-5](docs/m3-5-seed-acceptance.md).
+
+Google sign-in is available through **Continue with Google**. Enable the Google provider and configure its redirect URLs using [the setup guide](docs/google-authentication.md).
