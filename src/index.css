@@ -1,0 +1,12 @@
+@import 'tailwindcss';
+
+/* Base styles for CampusOS (Tailwind v4 default theme). */
+html {
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  background-color: #f1f5f9; /* slate-100 */
+}
