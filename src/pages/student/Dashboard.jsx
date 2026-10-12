@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ModulePage from '../../components/layout/ModulePage';
 import { StatCards, SectionCard } from '../../components/dashboard/StatCards';
 import StatusBadge from '../../components/ui/StatusBadge';
@@ -35,6 +36,7 @@ function overallTone(overall) {
 }
 
 export default function StudentDashboard() {
+  const navigate = useNavigate();
   const [record, setRecord] = useState({ loading: true, data: null, error: null });
   const [clearance, setClearance] = useState({ loading: true, data: null, error: null });
 
@@ -144,7 +146,7 @@ export default function StudentDashboard() {
         </SectionCard>
 
         <SectionCard title="Published offers" actions={
-          <Button variant="ghost" onClick={() => window.location.assign('/student/offers')}>View all</Button>
+          <Button variant="ghost" onClick={() => navigate('/student/offers')}>View all</Button>
         }>
           {activeOffers.length === 0 ? (
             <EmptyState title="No offers yet">

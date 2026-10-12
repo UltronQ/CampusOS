@@ -27,10 +27,14 @@ import { IMPORT_CONFIG, DIRECTORY_ROW_LIMIT } from '../app/config';
  * Nothing is swallowed and no write ever reports success optimistically.
  */
 
+/**
+ * Columns the DEPLOYED schema actually has (migrations 0001 + phase-one
+ * alignment). Program/year/section/registration/eligibility from the M1-2
+ * brief are not in the schema yet — see docs/m1-5-integration-quality.md.
+ */
 const STUDENT_COLUMNS =
-  'id, user_id, student_number, full_name, email, department_id, program, ' +
-  'academic_year, section, graduation_year, placement_registered, ' +
-  'eligibility_status, cgpa, phone, department:departments(id, code, name)';
+  'id, user_id, student_number, full_name, email, department_id, ' +
+  'graduation_year, cgpa, phone, backlogs, department:departments(id, code, name)';
 
 /** Map database error codes to honest, human-readable messages. */
 export function toHumanError(error) {
@@ -69,12 +73,14 @@ function sanitizeSearch(term) {
 
 /**
  * List students with directory filters. Empty filter values mean no constraint.
- * @param {{q?:string, department_id?:string, batch?:string|number, registered?:string, eligibility?:string}} filters
+ * Registration/eligibility filters were removed in M1-5: those columns do not
+ * exist in the deployed schema and a filter on them fails the whole query.
+ * @param {{q?:string, department_id?:string, batch?:string|number}} filters
  * @returns {Promise<Array<Record<string, any>>>}
  */
 export async function listStudents(filters = {}) {
   const supabase = getSupabase();
-  const { q = '', department_id = '', batch = '', registered = '', eligibility = '' } = filters;
+  const { q = '', department_id = '', batch = '' } = filters;
   let query = supabase
     .from('students')
     .select(STUDENT_COLUMNS)
@@ -91,8 +97,6 @@ export async function listStudents(filters = {}) {
   if (batch !== '' && batch !== null && batch !== undefined) {
     query = query.eq('graduation_year', Number(batch));
   }
-  if (registered !== '') query = query.eq('placement_registered', registered === 'true');
-  if (eligibility) query = query.eq('eligibility_status', eligibility);
 
   const { data, error } = await query;
   if (error) throw toHumanError(error);

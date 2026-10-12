@@ -13,11 +13,14 @@ export const DRIVE_STATUS_LABELS = Object.freeze({
   cancelled: 'Cancelled',
 });
 
-/** Stored values offered in drive forms (enum from migrations 0001+0003). */
+/**
+ * Stored values offered in drive forms. Must match the DEPLOYED database enum
+ * exactly (migrations 0001, contract v1.1): the PDF's "In Progress" value has
+ * no enum member yet — Member 2 adds it before the UI may offer it.
+ */
 export const DRIVE_STATUS_VALUES = Object.freeze([
   'draft',
   'published',
-  'in_progress',
   'completed',
   'cancelled',
 ]);
@@ -36,7 +39,6 @@ export const APPLICATION_STATUS_VALUES = Object.freeze([
   'applied',
   'in_progress',
   'selected',
-  'joined',
   'rejected',
   'withdrawn',
 ]);

@@ -112,7 +112,7 @@ export default function DashboardFilters({ departments = [], companies = [], val
           <ChipList
             ariaLabel="Drive status filters"
             options={DRIVE_STATUS_VALUES.filter((status) =>
-              ['published', 'in_progress', 'completed'].includes(status),
+              ['published', 'completed'].includes(status),
             ).map((status) => ({ value: status, label: DRIVE_STATUS_LABELS[status] }))}
             selected={value.drive_statuses}
             onToggle={(status) => set({ drive_statuses: toggle(value.drive_statuses, status) })}

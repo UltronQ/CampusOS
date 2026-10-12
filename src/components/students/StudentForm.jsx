@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import FormField from '../ui/FormField';
 import Button from '../ui/Button';
-import { ELIGIBILITY_STATUSES } from '../../app/config';
 
 /**
  * Add/Edit student form with client-side validation.
@@ -10,9 +9,11 @@ import { ELIGIBILITY_STATUSES } from '../../app/config';
  *
  * Payload produced: {
  *   student_number, full_name, email (lowercased), department_id,
- *   program, academic_year (int), section, graduation_year (int),
- *   placement_registered (boolean), eligibility_status, cgpa (num|null), phone
+ *   graduation_year (int), cgpa (num|null), phone, backlogs (int|null)
  * }
+ * M1-5: only columns that exist in the deployed schema are collected.
+ * Program/year/section/registration/eligibility arrive with the Member 2
+ * schema extension and are deliberately not collected yet.
  */
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -28,12 +29,6 @@ function validate(values, config) {
     errors.email = 'Enter a valid email address.';
   }
   if (!values.department_id) errors.department_id = 'Department is required.';
-  if (!values.program.trim()) errors.program = 'Program is required.';
-  const year = Number(values.academic_year);
-  if (!Number.isInteger(year) || year < 1 || year > 8) {
-    errors.academic_year = 'Year must be a whole number from 1 to 8.';
-  }
-  if (!values.section.trim()) errors.section = 'Section is required.';
   const batch = Number(values.graduation_year);
   if (
     !Number.isInteger(batch) ||
@@ -51,6 +46,12 @@ function validate(values, config) {
   if (values.phone.trim() !== '' && !PHONE_RE.test(values.phone.trim())) {
     errors.phone = 'Phone may contain digits, spaces, +, - or parentheses (7–15 digits).';
   }
+  if (values.backlogs.trim() !== '') {
+    const backlogs = Number(values.backlogs);
+    if (!Number.isInteger(backlogs) || backlogs < 0) {
+      errors.backlogs = 'Backlogs must be a whole number of 0 or more, or blank.';
+    }
+  }
   return errors;
 }
 
@@ -60,14 +61,10 @@ function toValues(student) {
     full_name: student?.full_name ?? '',
     email: student?.email ?? '',
     department_id: student?.department_id ?? '',
-    program: student?.program ?? '',
-    academic_year: student?.academic_year ?? '',
-    section: student?.section ?? '',
     graduation_year: student?.graduation_year ?? '',
-    placement_registered: student?.placement_registered ? 'true' : 'false',
-    eligibility_status: student?.eligibility_status ?? 'pending',
     cgpa: student?.cgpa ?? '',
     phone: student?.phone ?? '',
+    backlogs: student?.backlogs ?? '',
   };
 }
 
@@ -99,14 +96,10 @@ export default function StudentForm({ student, departments, config, busy = false
       full_name: values.full_name.trim(),
       email: values.email.trim().toLowerCase(),
       department_id: values.department_id,
-      program: values.program.trim(),
-      academic_year: Number(values.academic_year),
-      section: values.section.trim(),
       graduation_year: Number(values.graduation_year),
-      placement_registered: values.placement_registered === 'true',
-      eligibility_status: values.eligibility_status,
       cgpa: values.cgpa.trim() === '' ? null : Number(values.cgpa),
       phone: values.phone.trim() === '' ? null : values.phone.trim(),
+      backlogs: values.backlogs.trim() === '' ? null : Number(values.backlogs),
     });
   }
 
@@ -156,37 +149,6 @@ export default function StudentForm({ student, departments, config, busy = false
           ))}
         </FormField>
         <FormField
-          label="Program"
-          value={values.program}
-          onChange={set('program')}
-          error={errors.program}
-          placeholder="B.Tech, M.Tech, B.Sc…"
-          disabled={busy}
-          required
-        />
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            label="Year"
-            type="number"
-            min="1"
-            max="8"
-            value={values.academic_year}
-            onChange={set('academic_year')}
-            error={errors.academic_year}
-            disabled={busy}
-            required
-          />
-          <FormField
-            label="Section"
-            value={values.section}
-            onChange={set('section')}
-            error={errors.section}
-            placeholder="A"
-            disabled={busy}
-            required
-          />
-        </div>
-        <FormField
           label="Graduation batch"
           type="number"
           min={config.min_graduation_year}
@@ -198,34 +160,19 @@ export default function StudentForm({ student, departments, config, busy = false
           required
         />
         <FormField
-          label="Placement registration"
-          as="select"
-          value={values.placement_registered}
-          onChange={set('placement_registered')}
-          disabled={busy}
-        >
-          <option value="false">Not registered</option>
-          <option value="true">Registered</option>
-        </FormField>
-        <FormField
-          label="Eligibility status"
-          as="select"
-          value={values.eligibility_status}
-          onChange={set('eligibility_status')}
-          disabled={busy}
-        >
-          {ELIGIBILITY_STATUSES.map((status) => (
-            <option key={status} value={status}>
-              {status.replace('_', ' ')}
-            </option>
-          ))}
-        </FormField>
-        <FormField
           label="CGPA (optional)"
           inputMode="decimal"
           value={values.cgpa}
           onChange={set('cgpa')}
           error={errors.cgpa}
+          disabled={busy}
+        />
+        <FormField
+          label="Backlogs (optional)"
+          inputMode="numeric"
+          value={values.backlogs}
+          onChange={set('backlogs')}
+          error={errors.backlogs}
           disabled={busy}
         />
         <FormField
@@ -236,6 +183,11 @@ export default function StudentForm({ student, departments, config, busy = false
           disabled={busy}
         />
       </div>
+      <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
+        Program, year, section, placement registration and eligibility status are not
+        collected yet — those columns arrive with the Member 2 schema extension
+        (docs/m1-5-integration-quality.md).
+      </p>
       <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
         <Button variant="secondary" onClick={onCancel} disabled={busy}>
           Cancel

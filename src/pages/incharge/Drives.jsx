@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import ModulePage from '../../components/layout/ModulePage';
 import DataTable from '../../components/ui/DataTable';
-import StatusBadge from '../../components/ui/StatusBadge';
 import FormField from '../../components/ui/FormField';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
