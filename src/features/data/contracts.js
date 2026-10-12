@@ -4,7 +4,7 @@
  * Records and authorization come from Supabase; never trust a client role filter.
  * Money is integer minor units (INR paise), never floating-point currency.
  */
-export const DATA_CONTRACT_VERSION = '1.2.0';
+export const DATA_CONTRACT_VERSION = '1.3.0';
 export const USER_ROLES = Object.freeze(['placement_incharge', 'student']);
 export const IMPORT_HEADERS = Object.freeze([
   'student_number', 'full_name', 'email', 'department_code',
@@ -77,12 +77,12 @@ export const CLEARANCE_STATUSES = Object.freeze(['pending', 'cleared', 'not_appl
  * @property {ID[]} drive_ids
  * @property {string|null} drive_start_from YYYY-MM-DD.
  * @property {string|null} drive_start_to YYYY-MM-DD.
- * @property {('published'|'completed')[]} drive_statuses Empty = both.
+ * @property {DriveStatus[]} drive_statuses Empty = published/completed. Draft/cancelled never contribute successes.
  */
 /** @typedef {{department_ids:ID[], graduation_years:number[]}} NoDuesAnalyticsFilters */
 /** @typedef {{numerator:number, denominator:number, percent:number|null}} Rate */
-/** @typedef {{count:number, min_minor:number|null, max_minor:number|null, mean_minor:number|null, median_minor:number|null, currency:'INR'}} SalaryStatistics */
-/** @typedef {{department_id:ID, department_code:string, total_students:number, eligible_students:number, placed_students:number, unplaced_students:number, placement_rate:Rate, successful_offers:number}} DepartmentPlacementSummary */
+/** @typedef {{count:number, min_minor:number|null, max_minor:number|null, mean_minor:number|null, median_minor:number|null, currency:string}} SalaryStatistics */
+/** @typedef {{department_id:ID, department_code:string, total_students:number, registered_students:number, eligible_students:number, participating_students:number, placed_students:number, unplaced_students:number, placement_rate:Rate, successful_offers:number}} DepartmentPlacementSummary */
 /**
  * successful_offers includes offered/accepted only; placed_students is distinct
  * student IDs in those offers after all joins/exclusions. Salary is offer-weighted.
@@ -90,15 +90,23 @@ export const CLEARANCE_STATUSES = Object.freeze(['pending', 'cleared', 'not_appl
  * @property {string} contract_version
  * @property {string} snapshot_at Server timestamp, metadata only.
  * @property {PlacementAnalyticsFilters} filters Canonical validated filters.
+ * @property {number[]} available_graduation_years Actual stored batches, before cohort filtering.
  * @property {number} total_students Entire selected student cohort.
- * @property {number} eligible_students Distinct cohort students eligible for at least one scoped drive; placement-rate denominator.
+ * @property {number} registered_students Cohort students with placement_registered=true.
+ * @property {number} eligible_students Distinct cohort students satisfying stored criteria for at least one scoped active drive, even without applications.
+ * @property {number} participating_students Distinct cohort students with non-withdrawn applications to scoped active drives.
  * @property {number} placed_students
- * @property {number} unplaced_students
+ * @property {number} unplaced_students total_students minus placed_students.
+ * @property {'cohort_students'} placement_denominator Placement percentage uses the complete department/batch cohort.
  * @property {Rate} placement_rate
  * @property {number} applications Non-withdrawn applications in scoped eligible drives.
  * @property {number} successful_offers
  * @property {number} students_with_multiple_offers
- * @property {SalaryStatistics} salary
+ * @property {SalaryStatistics} salary INR offer-weighted packages; no currency conversion.
+ * @property {SalaryStatistics[]} salary_by_currency Independent currency groups.
+ * @property {number} excluded_package_offers Successful offers missing valid safe-integer compensation or currency.
+ * @property {{company_id:ID, company_name:string, selections:number, selected_applications:number, placed_students:number, offers:number}[]} companies Selections are unique selected students, independently of offers.
+ * @property {{graduation_year:number, total_students:number, registered_students:number, eligible_students:number, participating_students:number, placed_students:number, unplaced_students:number, placement_rate:Rate, successful_offers:number}[]} batch_trends Empty unless at least two graduation batches exist in the cohort.
  * @property {DepartmentPlacementSummary[]} by_department Sorted by department_code then ID.
  */
 /** @typedef {{department_id:ID, department_code:string, total_students:number, cleared_students:number, pending_students:number, not_configured_students:number, clearance_rate:Rate}} DepartmentClearanceSummary */

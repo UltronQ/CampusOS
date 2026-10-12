@@ -84,5 +84,5 @@ export function minorToRupees(minor) {
 export function formatCtc(minor, currency = 'INR') {
   if (minor === null || minor === undefined) return '—';
   const symbol = currency === 'INR' ? '₹' : `${currency} `;
-  return `${symbol}${Number(minor).toLocaleString('en-IN')}`;
+  return `${symbol}${(Number(minor) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }

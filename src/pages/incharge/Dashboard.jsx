@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import Button from '../../components/ui/Button';
 import {
   ResponsiveContainer,
   BarChart,
@@ -20,17 +21,15 @@ import { getPlacementAnalytics, getNoDuesAnalytics } from '../../services/analyt
 /**
  * Module 4 — Placement In-Charge dashboard.
  *
- * Every figure is fetched from the analytics service (Member 3's module when
- * present, otherwise an authorized database snapshot that applies the same
- * contract rules). Nothing is hardcoded and totals are never derived by
- * counting application rows in this file. Each section is labelled with its
- * data source so the reviewer can tell analytics from snapshot.
+ * Placement figures come from Member 3's consistent database snapshot engine.
+ * No-dues retains its assigned service boundary. This page renders supplied
+ * metrics; it never derives student placements by counting application rows.
  */
 
 function DepartmentPlacementChart({ rows }) {
   const data = rows.map((row) => ({
     code: row.department_code,
-    percent: row.placement_rate.percent ?? 0,
+    percent: row.placement_rate.percent,
     placed: row.placed_students,
     eligible: row.eligible_students,
   }));
@@ -55,7 +54,7 @@ function DepartmentPlacementChart({ rows }) {
 }
 
 function CompanyOutcomesChart({ rows }) {
-  const data = rows.map((row) => ({ name: row.company_name, placed: row.placed_students, offers: row.offers }));
+  const data = rows.map((row) => ({ name: row.company_name, selected: row.selections, placed: row.placed_students, offers: row.offers }));
   if (data.length === 0) return <EmptyState title="No company outcomes in scope" />;
   return (
     <div className="h-64 w-full">
@@ -65,6 +64,7 @@ function CompanyOutcomesChart({ rows }) {
           <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-20} textAnchor="end" height={50} />
           <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
           <Tooltip />
+          <Bar dataKey="selected" name="Students selected" fill="#059669" radius={[4, 4, 0, 0]} />
           <Bar dataKey="placed" name="Students placed" fill="#4f46e5" radius={[4, 4, 0, 0]} />
           <Bar dataKey="offers" name="Offers" fill="#c7d2fe" radius={[4, 4, 0, 0]} />
         </BarChart>
@@ -77,8 +77,16 @@ export default function InchargeDashboard() {
   const departments = useDepartments();
   const companies = useCompanies();
   const [filters, setFilters] = useState(EMPTY_PLACEMENT_FILTERS);
+  const [refresh, setRefresh] = useState(0);
   const [placement, setPlacement] = useState({ loading: true, data: null, source: 'snapshot', error: null });
   const [noDues, setNoDues] = useState({ loading: true, data: null, source: 'snapshot', error: null });
+
+  useEffect(() => {
+    const update = () => setRefresh((value) => value + 1);
+    const timer = window.setInterval(update, 30000);
+    window.addEventListener('focus', update);
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', update); };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -93,7 +101,7 @@ export default function InchargeDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [filters]);
+  }, [filters, refresh]);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,14 +129,19 @@ export default function InchargeDashboard() {
   return (
     <ModulePage
       title="Placement Dashboard"
-      description="Live placement performance and no-dues completion. All statistics come from the analytics service over an authorized snapshot — never from counting application rows in the browser."
+      description="Placement statistics from a consistent database snapshot. Refreshes every 30 seconds and when you return to this window."
     >
       <DashboardFilters
         departments={departments.data ?? []}
         companies={companies.data ?? []}
+        graduationYears={p?.available_graduation_years ?? []}
         value={filters}
         onChange={setFilters}
       />
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
+        <span>{p ? 'Updated ' + new Date(p.snapshot_at).toLocaleString() : 'Awaiting database snapshot'}</span>
+        <Button variant="secondary" disabled={placement.loading} onClick={() => setRefresh((value) => value + 1)}>Refresh placement analytics</Button>
+      </div>
 
       {placement.error ? (
         <ErrorState title="Placement analytics unavailable" error={placement.error} />
@@ -140,15 +153,25 @@ export default function InchargeDashboard() {
         <>
           <SectionCard title="Placement performance" source={placement.source}>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCards label="Placement rate" value={<RateText rate={p.placement_rate} />} sub="placed ÷ eligible" />
+              <StatCards label="Placement rate" value={<RateText rate={p.placement_rate} />} sub="unique placed ÷ selected student cohort" />
               <StatCards label="Placed students" value={p.placed_students} tone="success" sub={multiOfferNote} />
-              <StatCards label="Unplaced (eligible)" value={p.unplaced_students} tone={p.unplaced_students > 0 ? 'warning' : 'default'} sub={`${p.eligible_students} eligible · ${p.total_students} in cohort`} />
+              <StatCards label="Not yet placed" value={p.unplaced_students} tone={p.unplaced_students > 0 ? 'warning' : 'default'} sub={`${p.total_students} students in cohort`} />
               <StatCards label="Total offers" value={p.successful_offers} sub={`${p.applications} application(s) in scope`} />
             </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <StatCards label="Registered students" value={p.registered_students} sub="placement registration recorded" />
+              <StatCards label="Eligible students" value={p.eligible_students} sub="meet criteria for at least one scoped active drive" />
+              <StatCards label="Participating students" value={p.participating_students} sub="distinct students with non-withdrawn applications" />
+            </div>
+            <p className="mt-3 text-sm text-slate-600">Placement percentage uses all students in the selected department and graduation batch. Company and recruitment-status filters narrow outcomes, while the cohort denominator stays fixed.</p>
             <div className="mt-5">
               <h3 className="text-sm font-semibold text-slate-700">Package summary</h3>
               <div className="mt-2">
                 <SalarySummary salary={p.salary} />
+                <p className="mt-2 text-xs text-slate-500">INR packages only; averages are per valid offer. {p.excluded_package_offers} offer(s) have no usable compensation data.</p>
+                {p.salary_by_currency.filter((salary) => salary.currency !== 'INR').map((salary) => (
+                  <div key={salary.currency} className="mt-3"><p className="text-sm font-medium">{salary.currency} packages (separate currency)</p><SalarySummary salary={salary} /></div>
+                ))}
               </div>
             </div>
           </SectionCard>
@@ -161,6 +184,15 @@ export default function InchargeDashboard() {
               <CompanyOutcomesChart rows={p.companies ?? []} />
             </SectionCard>
           </div>
+
+          <SectionCard title="Graduation batch trends" source={placement.source}>
+            {p.batch_trends.length < 2 ? <p className="text-sm text-slate-500">At least two stored graduation batches are required to compare placement trends.</p> : (
+              <div className="overflow-x-auto"><table className="min-w-full text-sm">
+                <thead><tr className="text-left"><th className="p-2">Batch</th><th className="p-2">Students</th><th className="p-2">Placed</th><th className="p-2">Offers</th><th className="p-2">Placement %</th></tr></thead>
+                <tbody>{p.batch_trends.map((row) => <tr key={row.graduation_year}><td className="p-2">{row.graduation_year}</td><td className="p-2">{row.total_students}</td><td className="p-2">{row.placed_students}</td><td className="p-2">{row.successful_offers}</td><td className="p-2"><RateText rate={row.placement_rate} /></td></tr>)}</tbody>
+              </table></div>
+            )}
+          </SectionCard>
 
           <SectionCard title="Department breakdown" source={placement.source}>
             <div className="overflow-x-auto">

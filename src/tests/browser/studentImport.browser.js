@@ -18,10 +18,18 @@ const db = await createTestDatabase();
 let server;
 let browser;
 let writes = 0;
+let snapshots = 0;
+let databaseQueue = Promise.resolve();
+const authorized = (query, parameters = []) => {
+  const next = databaseQueue.then(() => withUser(db, actor, () => db.query(query, parameters)));
+  databaseQueue = next.catch(() => {});
+  return next;
+};
 try {
   await db.query('INSERT INTO auth.users(id) VALUES ($1)', [actor]);
   await db.query("INSERT INTO profiles(id,role) VALUES ($1,'placement_incharge')", [actor]);
   await db.exec(await readProjectFile('supabase/seed/seed.sql'));
+  await db.exec("UPDATE students SET graduation_year=2028 WHERE student_number='005'");
   server = await createServer({ root, server: { host: '127.0.0.1', port: 0 }, logLevel: 'error' });
   await server.listen();
   const port = server.httpServer.address().port;
@@ -45,13 +53,21 @@ try {
       if (url.pathname === '/auth/v1/token') {
         data = { access_token: token, refresh_token: 'test-only-refresh', token_type: 'bearer', expires_in: 3600, expires_at: expiry, user };
       } else if (url.pathname === '/auth/v1/user') data = user;
-      else if (url.pathname === '/rest/v1/profiles') data = (await withUser(db, actor, () => db.query('SELECT id,role FROM profiles WHERE id = $1', [actor]))).rows;
+      else if (url.pathname === '/rest/v1/profiles') data = (await authorized('SELECT id,role FROM profiles WHERE id = $1', [actor])).rows;
+      else if (url.pathname === '/rest/v1/rpc/get_placement_analytics_snapshot') {
+        snapshots++;
+        data = (await authorized('SELECT public.get_placement_analytics_snapshot() AS result')).rows[0].result;
+      } else if (url.pathname === '/rest/v1/companies') data = (await authorized('SELECT * FROM companies ORDER BY name')).rows;
+      else if (url.pathname === '/rest/v1/departments') data = (await authorized('SELECT * FROM departments ORDER BY code')).rows;
+      else if (url.pathname === '/rest/v1/students') data = (await authorized('SELECT s.*, jsonb_build_object(\'code\',d.code) AS departments FROM students s JOIN departments d ON d.id=s.department_id')).rows;
+      else if (url.pathname === '/rest/v1/clearance_items') data = (await authorized('SELECT * FROM clearance_items')).rows;
+      else if (url.pathname === '/rest/v1/student_clearances') data = (await authorized('SELECT * FROM student_clearances')).rows;
       else if (url.pathname === '/rest/v1/rpc/get_student_import_context') {
-        data = (await withUser(db, actor, () => db.query('SELECT public.get_student_import_context() AS result'))).rows[0].result;
+        data = (await authorized('SELECT public.get_student_import_context() AS result')).rows[0].result;
       } else if (url.pathname === '/rest/v1/rpc/commit_student_import') {
         const args = request.postDataJSON();
         writes++;
-        data = (await withUser(db, actor, () => db.query('SELECT public.commit_student_import($1::jsonb,$2,$3) AS result', [JSON.stringify(args.p_rows), args.p_confirmed, args.p_mode]))).rows[0].result;
+        data = (await authorized('SELECT public.commit_student_import($1::jsonb,$2,$3) AS result', [JSON.stringify(args.p_rows), args.p_confirmed, args.p_mode])).rows[0].result;
       } else if (url.pathname === '/auth/v1/logout') data = {};
       else throw new Error(`Unexpected test API request: ${url.pathname}`);
       await route.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: JSON.stringify(data) });
@@ -64,6 +80,48 @@ try {
   await page.getByLabel('Password', { exact: true }).fill('synthetic-test-input');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await page.waitForURL('**/incharge/dashboard');
+  const expectMetric = async (label, value) => {
+    const metric = page.getByText(label, { exact: true }).locator('..').locator('p').nth(1);
+    await page.waitForFunction(({ label, value }) => [...document.querySelectorAll('p')].some((p) => p.textContent === label && p.parentElement.querySelectorAll('p')[1]?.textContent === value), { label, value });
+    assert.equal(await metric.innerText(), value);
+  };
+  await expectMetric('Placed students', '2');
+  await expectMetric('Registered students', '0');
+  await expectMetric('Participating students', '3');
+  await expectMetric('Total offers', '3');
+  await page.getByRole('group', { name: 'Company filters' }).getByLabel('Demo Systems', { exact: true }).locator('..').click();
+  await expectMetric('Placed students', '1');
+  await page.getByRole('group', { name: 'Department filters' }).getByLabel('ECE', { exact: true }).locator('..').click();
+  await expectMetric('Placed students', '0');
+  await page.getByRole('button', { name: 'Clear all', exact: true }).click();
+  await expectMetric('Placed students', '2');
+  await page.getByRole('group', { name: 'Batch filters' }).getByLabel('2028', { exact: true }).locator('..').click();
+  await expectMetric('Not yet placed', '1');
+  await expectMetric('Placed students', '0');
+  await page.getByRole('button', { name: 'Clear all', exact: true }).click();
+  await expectMetric('Placed students', '2');
+  const previousSnapshots = snapshots;
+  await db.exec("UPDATE students SET placement_registered=TRUE WHERE student_number='001'");
+  await page.getByRole('button', { name: 'Refresh placement analytics', exact: true }).click();
+  await expectMetric('Registered students', '1');
+  assert.ok(snapshots > previousSnapshots);
+  await db.exec("UPDATE students SET placement_registered=FALSE WHERE student_number='001'");
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expectMetric('Registered students', '0');
+  await page.getByRole('group', { name: 'Drive status filters' }).getByLabel('Cancelled', { exact: true }).locator('..').click();
+  await expectMetric('Total offers', '0');
+  await page.getByText('No salary data in scope.', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Clear all', exact: true }).click();
+  await expectMetric('Total offers', '3');
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: join(tmpdir(), 'campusos-placement-analytics-desktop.png'), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: join(tmpdir(), 'campusos-placement-analytics-mobile.png'), fullPage: true });
+  const overflow = await page.evaluate(() => ({ width: window.innerWidth, scroll: document.documentElement.scrollWidth,
+    elements: [...document.querySelectorAll('*')].filter((el) => el.getBoundingClientRect().width > window.innerWidth).slice(-12).map((el) => ({ tag: el.tagName, class: el.className?.baseVal ?? el.className, width: el.getBoundingClientRect().width })) }));
+  assert.ok(overflow.scroll <= overflow.width + 1, JSON.stringify(overflow));
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  console.log('PASS: live dashboard uses stored analytics, all required filters, manual/focus refresh and mobile layout');
   await page.goto(`http://127.0.0.1:${port}/incharge/import`);
   await page.getByRole('heading', { name: 'Import Students', exact: true }).waitFor();
 

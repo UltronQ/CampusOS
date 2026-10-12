@@ -38,10 +38,10 @@ Suggested stable validation codes: REQUIRED, INVALID_EMAIL, UNKNOWN_DEPARTMENT, 
 ## Calculation edge mutations
 
 - Add successful offer to s1's a1: offer count rises by one, placed unchanged; stage rows never multiply counts.
-- Add two identically scoped unrestricted drives: eligible students remain 5, never 10. Restrict both to CSE: eligible=3; restrict one to ECE and one to CSE: eligible=4. Configured CGPA/backlog threshold with unknown student data excludes that student. No matching drives has denominator=0 and null rate.
+- Add two identically scoped unrestricted drives: eligible students remain 5, never 10. Restrict both to CSE: eligible=3; restrict one to ECE and one to CSE: eligible=4. Configured CGPA/backlog threshold with unknown student data excludes that student. No matching drives has eligible=0 and 0% against a nonempty cohort; only an empty cohort has denominator=0 and null rate (v1.3).
 - Revoke o1: s1 remains placed by o2, multi count drops to zero. Withdraw a2: o2 disappears, s1 still placed through o1.
 - All salaries null: salary count=0/null stats, placed count unchanged.
-- Salaries [0,1]: mean/median=1 paise (half-up), zero included. Negative/noninteger/mixed currency: integrity failure.
+- Salaries [0,1]: mean/median=1 paise (half-up), zero included. Negative/noninteger/unsafe/missing values are excluded from packages; mixed currencies are summarized separately. INR remains the primary salary summary (v1.3).
 - Remove cl1: s1 pending, missing rises by one. Mark i2 optional: it stops affecting mandatory pair counts. Remove all active mandatory CSE items: all CSE students not_configured.
 - Terminal clearance without approved_by/approved_at, cross-department decision or duplicate student-item decision: integrity failure.
 - One remaining mandatory decision pending prevents Cleared even if a statement displays only cleared items.

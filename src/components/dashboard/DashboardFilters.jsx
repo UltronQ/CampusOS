@@ -1,7 +1,6 @@
 import FormField from '../ui/FormField';
 import Button from '../ui/Button';
 import { DRIVE_STATUS_LABELS, DRIVE_STATUS_VALUES } from '../../app/placementLabels';
-import { IMPORT_CONFIG } from '../../app/config';
 
 /**
  * Shared dashboard filter bar (M1-4). Emits a PlacementAnalyticsFilters-shaped
@@ -10,10 +9,6 @@ import { IMPORT_CONFIG } from '../../app/config';
  * reference data; empty arrays mean "no constraint" per the contract.
  */
 
-const BATCHES = Array.from(
-  { length: IMPORT_CONFIG.max_graduation_year - IMPORT_CONFIG.min_graduation_year + 1 },
-  (_, index) => IMPORT_CONFIG.min_graduation_year + index,
-);
 
 function toggle(list, value) {
   return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
@@ -47,12 +42,12 @@ function ChipList({ options, selected, onToggle, ariaLabel }) {
   );
 }
 
-export default function DashboardFilters({ departments = [], companies = [], value, onChange }) {
+export default function DashboardFilters({ departments = [], companies = [], graduationYears = [], value, onChange }) {
   const isFiltered =
     value.department_ids.length > 0 ||
     value.graduation_years.length > 0 ||
     value.company_ids.length > 0 ||
-    value.drive_statuses.length > 0;
+    value.drive_statuses.length > 0 || Boolean(value.drive_start_from || value.drive_start_to);
 
   function set(patch) {
     onChange({ ...value, ...patch });
@@ -93,7 +88,7 @@ export default function DashboardFilters({ departments = [], companies = [], val
         <FormField as="fieldset" label="Graduation batch" hint="No selection = all batches">
           <ChipList
             ariaLabel="Batch filters"
-            options={BATCHES.map((year) => ({ value: year, label: String(year) }))}
+            options={graduationYears.map((year) => ({ value: year, label: String(year) }))}
             selected={value.graduation_years}
             onToggle={(year) => set({ graduation_years: toggle(value.graduation_years, year) })}
           />
@@ -108,12 +103,10 @@ export default function DashboardFilters({ departments = [], companies = [], val
           />
         </FormField>
 
-        <FormField as="fieldset" label="Recruitment drive status" hint="No selection = Open and Completed drives">
+        <FormField as="fieldset" label="Recruitment drive status" hint="No selection = Open and Completed. Draft/cancelled drives never count as placements.">
           <ChipList
             ariaLabel="Drive status filters"
-            options={DRIVE_STATUS_VALUES.filter((status) =>
-              ['published', 'completed'].includes(status),
-            ).map((status) => ({ value: status, label: DRIVE_STATUS_LABELS[status] }))}
+            options={DRIVE_STATUS_VALUES.map((status) => ({ value: status, label: DRIVE_STATUS_LABELS[status] }))}
             selected={value.drive_statuses}
             onToggle={(status) => set({ drive_statuses: toggle(value.drive_statuses, status) })}
           />
