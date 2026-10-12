@@ -4,7 +4,7 @@
  * Records and authorization come from Supabase; never trust a client role filter.
  * Money is integer minor units (INR paise), never floating-point currency.
  */
-export const DATA_CONTRACT_VERSION = '1.1.0';
+export const DATA_CONTRACT_VERSION = '1.2.0';
 export const USER_ROLES = Object.freeze(['placement_incharge', 'student']);
 export const IMPORT_HEADERS = Object.freeze([
   'student_number', 'full_name', 'email', 'department_code',
@@ -22,7 +22,7 @@ export const CLEARANCE_STATUSES = Object.freeze(['pending', 'cleared', 'not_appl
 /** @typedef {'draft'|'published'|'completed'|'cancelled'} DriveStatus */
 /** @typedef {'pending'|'cleared'|'not_applicable'} ClearanceStatus */
 /** @typedef {'pending'|'cleared'|'not_configured'} OverallClearanceStatus */
-/** @typedef {{code:string, field:string|null, message:string}} ValidationIssue */
+/** @typedef {{code:string, field:string|null, message:string, source_row?:number|null}} ValidationIssue */
 /**
  * Spreadsheet row number includes header (first data row = 2).
  * Preserve student_number and phone as text; do not lose leading zeroes.
@@ -59,7 +59,13 @@ export const CLEARANCE_STATUSES = Object.freeze(['pending', 'cleared', 'not_appl
  * @property {'insert_only_atomic'} mode
  */
 /** @typedef {{source_row:number, student_id:ID}} ImportedStudent */
-/** @typedef {{committed:boolean, inserted_count:number, students:ImportedStudent[], errors:ValidationIssue[]}} ImportCommitResult */
+/** @typedef {{source_row:number, status:'successful'|'skipped'|'failed', student_id?:ID, errors:ValidationIssue[]}} ImportRowOutcome */
+/** @typedef {{confirmed:boolean, mode?:'atomic'|'partial'}} ImportCommitOptions */
+/**
+ * successful + skipped + failed = total. duplicate_count is a subset, not an
+ * extra outcome. Atomic rejection skips otherwise-valid rows and inserts zero.
+ * @typedef {{committed:boolean, inserted_count:number, successful_count:number, skipped_count:number, failed_count:number, duplicate_count:number, total_count:number, mode:'atomic'|'partial', history_id:ID, students:ImportedStudent[], errors:ValidationIssue[], row_results:ImportRowOutcome[]}} ImportCommitResult
+ */
 /**
  * Empty arrays mean no constraint. Filters intersect. Dates are ISO calendar dates,
  * inclusive, applied to drives.start_date, never offer creation dates.
@@ -132,12 +138,12 @@ export const CLEARANCE_STATUSES = Object.freeze(['pending', 'cleared', 'not_appl
  * @property {{name:string, row_count:number}[]} sheets CSV = one sheet named Report.
  * @property {string[]} warnings
  */
-/** @typedef {{code:'INVALID_INPUT'|'UNAUTHORIZED'|'FORBIDDEN'|'CONFLICT'|'DATABASE_ERROR'|'EXPORT_LIMIT', message:string, fields?:ValidationIssue[]}} DataFeatureError */
+/** @typedef {{code:'INVALID_INPUT'|'UNAUTHORIZED'|'FORBIDDEN'|'NOT_FOUND'|'CONFLICT'|'DATABASE_ERROR'|'EXPORT_LIMIT', message:string, backend_code?:string|null, fields?:ValidationIssue[]}} DataFeatureError */
 
 // Integration signatures (implementations belong in the modules documented below):
 /** @typedef {(file:File, context:ImportValidationContext) => Promise<ImportValidationResult>} ValidateStudentFile */
 /** @typedef {(validation:ImportValidationResult, context:ImportValidationContext) => ImportPreviewResult} BuildImportPreview */
-/** @typedef {(preview:ImportPreviewResult) => Promise<ImportCommitResult>} CommitStudentImport */
+/** @typedef {(preview:ImportPreviewResult, options:ImportCommitOptions) => Promise<ImportCommitResult>} CommitStudentImport */
 /** @typedef {(filters:PlacementAnalyticsFilters) => Promise<PlacementAnalyticsOutput>} GetPlacementAnalytics */
 /** @typedef {(filters:NoDuesAnalyticsFilters) => Promise<NoDuesAnalyticsOutput>} GetNoDuesAnalytics */
 /** @typedef {(input:ReportExportInput) => Promise<ReportExportOutput>} ExportReport */

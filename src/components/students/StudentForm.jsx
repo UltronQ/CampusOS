@@ -62,7 +62,9 @@ function toValues(student) {
     email: student?.email ?? '',
     department_id: student?.department_id ?? '',
     graduation_year: student?.graduation_year ?? '',
-    cgpa: student?.cgpa ?? '',
+    placement_registered: student?.placement_registered ? 'true' : 'false',
+    eligibility_status: student?.eligibility_status ?? 'pending',
+    cgpa: String(student?.cgpa ?? ''),
     phone: student?.phone ?? '',
     backlogs: student?.backlogs ?? '',
   };

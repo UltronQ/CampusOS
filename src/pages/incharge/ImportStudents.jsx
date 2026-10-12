@@ -22,8 +22,8 @@ import * as studentsService from '../../services/studentsService';
  *    tables, error rendering and result counts.
  *
  * Atomicity: commit is insert-only and all-or-nothing, so a real commit
- * either reports successful=rows and failed=0, or fails with failed=0 and an
- * error. "Skipped" is always 0 in v1 (no partial writes, ever).
+ * reports actual inserts on success or failed/skipped rows on rejection.
+ * On atomic rejection, otherwise-valid rows are reported as skipped.
  */
 
 const TEMPLATE_HEADERS = IMPORT_HEADERS;
@@ -144,7 +144,7 @@ export default function ImportStudents() {
     setCommitError(null);
     setCommitResult(null);
     try {
-      const result = await studentsService.commitStudentImport(preview);
+      const result = await studentsService.commitStudentImport(preview, { confirmed: true });
       setCommitResult(result);
     } catch (err) {
       setCommitError(err);
@@ -313,23 +313,28 @@ export default function ImportStudents() {
           <dl className="mt-3 grid grid-cols-3 gap-3">
             <div className="rounded-lg bg-white p-3">
               <dt className="text-xs text-slate-500">Successful rows</dt>
-              <dd className="text-lg font-semibold text-emerald-800">{commitResult.inserted_count}</dd>
+              <dd className="text-lg font-semibold text-emerald-800">{commitResult.successful_count}</dd>
             </div>
             <div className="rounded-lg bg-white p-3">
               <dt className="text-xs text-slate-500">Failed rows</dt>
               <dd className="text-lg font-semibold text-red-700">
-                {commitResult.committed ? 0 : validation?.invalid_rows ?? 0}
+                {commitResult.failed_count}
               </dd>
             </div>
             <div className="rounded-lg bg-white p-3">
               <dt className="text-xs text-slate-500">Skipped rows</dt>
-              <dd className="text-lg font-semibold text-slate-700">0</dd>
+              <dd className="text-lg font-semibold text-slate-700">{commitResult.skipped_count}</dd>
             </div>
           </dl>
           <p className="mt-3 text-xs text-emerald-800">
-            Imports are insert-only and atomic: skipped rows never occur. If this commit had
-            failed, all three counts would have been zero and no student would exist.
+            Counts come from the database. This page uses atomic imports: if a row fails,
+            no students are inserted and the remaining valid rows are skipped.
           </p>
+          {commitResult.row_results.filter((row) => row.status !== 'successful').map((row) => (
+            <p key={row.source_row} className="mt-2 text-sm text-red-700">
+              Row {row.source_row}: {row.errors.map((issue) => `${issue.field ? `${issue.field}: ` : ''}${issue.message}`).join(' ')}
+            </p>
+          ))}
           {commitResult.committed ? (
             <Button variant="secondary" className="mt-3" onClick={() => navigate('/incharge/students')}>
               View students directory →
