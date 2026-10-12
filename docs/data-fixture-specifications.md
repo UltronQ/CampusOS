@@ -11,7 +11,7 @@ uses `pending`. See `docs/backend-integration-handoff.md` for reproducible check
 
 ## Base calculations
 
-Unfiltered placement: 5 students, 2 distinct placed, 3 unplaced, 40% placement rate, 5 non-withdrawn applications, 3 successful offers, 1 student with multiple offers. Only o1/o2/o6 qualify. Salary count=2, min=10,000,000 paise, max=20,000,000, mean/median=15,000,000. Null salary on o6 does not remove s4 from placement counts. Department expected objects are in the fixture.
+Unfiltered placement: 5 cohort students, 5 eligible students (base drives have no eligibility restrictions), 2 distinct placed, 3 unplaced, 40% placement rate, 5 non-withdrawn applications, 3 successful offers, 1 student with multiple offers. Only o1/o2/o6 qualify. Salary count=2, min=10,000,000 paise, max=20,000,000, mean/median=15,000,000. Null salary on o6 does not remove s4 from placement counts. Department expected objects are in the fixture. Eligibility adds department/year/CGPA/backlog predicates; count the union of eligible students across scoped drives, not student-drive pairs.
 
 Unfiltered no-dues: 2 cleared, 2 pending, 1 not_configured, 40% clearance rate. Mandatory student-item pairs total 7: 2 cleared, 1 not_applicable, 1 pending, 3 missing. s1 is cleared despite optional/inactive pending items. s2/s3 pending; s4 cleared; s5 not_configured.
 
@@ -20,9 +20,9 @@ Unfiltered no-dues: 2 cleared, 2 pending, 1 not_configured, 40% clearance rate. 
 - department_ids=[cse]: total=3, placed=1, unplaced=2, rate=33.33%, applications=4, offers=2, multi-offer students=1. Clearance: 1 cleared, 2 pending, 0 unconfigured.
 - company_ids=[co1]: total=5, placed=1, applications=2, offers=1, multi=0, salary=10,000,000 throughout. No-dues does not accept company filters.
 - drive_start_from=drive_start_to=2026-10-12: total=5, placed=2, applications=3, offers=2, multi=0, salary count=1 with 20,000,000 throughout.
-- drive_ids=[d3] or [d4]: total=5, placed=0, applications=0, offers=0, salary count=0/null stats.
+- drive_ids=[d3] or [d4]: total=5, eligible=0, placed=0, placement rate=null, applications=0, offers=0, salary count=0/null stats.
 - graduation_years=[2028]: total=0, counts=0, rates=null, salary stats=null, by_department empty.
-- Unknown valid-format drive ID: zero matching offers and unchanged cohort. Unknown cohort department ID: empty cohort. Reject malformed IDs at the service boundary appropriate to production UUID IDs.
+- Unknown valid-format drive ID: zero matching offers, eligible=0, rate=null, and unchanged cohort. Unknown cohort department ID: empty cohort. Reject malformed IDs at the service boundary appropriate to production UUID IDs.
 - Intersect CSE and co2: total=3, placed=1, applications=2, offers=1, salary=20,000,000, rate=33.33%.
 - Duplicated/reordered filter IDs give identical canonical filter arrays and metrics. Invalid date, inverted bounds, cancelled/draft status request: INVALID_INPUT.
 
@@ -30,11 +30,11 @@ Unfiltered no-dues: 2 cleared, 2 pending, 1 not_configured, 40% clearance rate. 
 
 Use validImportRows with context: valid=2, invalid=0, total=2, preview insert_count=2, blocked_count=0, source rows 2/3, normalized values equal expectedNormalizedImportRows. Successful committed database records resolve CSE/ECE IDs and preserve 006/007 text.
 
-Generate CSV and XLSX versions of each case:
+Generate CSV and XLSX versions of each case (backlogs is optional, blank -> null, otherwise nonnegative integer):
 - Valid optional columns omitted; normalized cgpa/phone null. BOM accepted. Blank physical rows ignored without renumbering later source rows.
 - Duplicate student_number across both rows: both invalid. Duplicate email with different case/whitespace: both invalid.
 - Existing number 001 or existing ONE@EXAMPLE.TEST: conflict error, can_commit false. No upsert.
-- Unknown department, blank required value, malformed email, year 2027.5/outside bounds, cgpa -1/10.01/NaN/8abc, invalid phone: relevant field errors.
+- Unknown department, blank required value, malformed email, year 2027.5/outside bounds, cgpa -1/10.01/NaN/8abc, backlogs -1/1.5/non-numeric, invalid phone: relevant field errors.
 - Numeric identifier cell, formula or Excel error: invalid, no lost-leading-zero recovery.
 - Unknown/duplicate/missing required headers, empty file, header-only file, multiple nonempty XLSX sheets, unsupported extension, max_rows+1: file errors block commit.
 - Mixed one valid/one invalid: preview may show one insert candidate, can_commit=false; commit must insert zero.
@@ -45,6 +45,7 @@ Suggested stable validation codes: REQUIRED, INVALID_EMAIL, UNKNOWN_DEPARTMENT, 
 ## Calculation edge mutations
 
 - Add successful offer to s1's a1: offer count rises by one, placed unchanged; stage rows never multiply counts.
+- Add two identically scoped unrestricted drives: eligible students remain 5, never 10. Restrict both to CSE: eligible=3; restrict one to ECE and one to CSE: eligible=4. Configured CGPA/backlog threshold with unknown student data excludes that student. No matching drives has denominator=0 and null rate.
 - Revoke o1: s1 remains placed by o2, multi count drops to zero. Withdraw a2: o2 disappears, s1 still placed through o1.
 - All salaries null: salary count=0/null stats, placed count unchanged.
 - Salaries [0,1]: mean/median=1 paise (half-up), zero included. Negative/noninteger/mixed currency: integrity failure.
@@ -68,4 +69,4 @@ RLS end-to-end: student s1 can read/export only own records and published result
 4. Change an offer, drive and mandatory clearance as in-charge; refresh analytics, reopen exports and compare counts/statuses.
 5. Run student authorization checks above using direct Supabase requests as well as UI controls.
 
-M3-1 only supplies contracts/specifications and syntax/reconciliation smoke checks. This procedure is pending until implementations and database are available.
+M3-1 supplies contracts/specifications. Phase-one correction tests in phaseOne.test.js execute all migrations and the repaired seed in PostgreSQL and validate CGPA/backlog bounds, safe deletes and student-drive RLS. The end-to-end import/analytics/export procedure above remains pending until later implementations and configured Supabase sessions are available.

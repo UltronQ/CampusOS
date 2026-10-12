@@ -2,7 +2,9 @@
 BEGIN;
 -- NUMERIC(3,2) cannot represent the documented CGPA upper bound, 10.00.
 ALTER TABLE students ALTER COLUMN cgpa TYPE NUMERIC(4,2);
-ALTER TABLE students ADD COLUMN backlogs INTEGER CHECK (backlogs >= 0);
+-- Phase-one alignment already supplies this column in the complete migration chain.
+-- Keep the standalone recruitment setup compatible without rewriting existing data.
+ALTER TABLE students ADD COLUMN IF NOT EXISTS backlogs INTEGER CHECK (backlogs >= 0);
 ALTER TABLE drives
   ADD COLUMN department_ids UUID[] NOT NULL DEFAULT '{}',
   ADD COLUMN graduation_years INTEGER[] NOT NULL DEFAULT '{}',
@@ -35,9 +37,18 @@ LANGUAGE sql IMMUTABLE SET search_path = public AS $$
     AND (d.maximum_backlogs IS NULL OR (s.backlogs IS NOT NULL AND s.backlogs <= d.maximum_backlogs));
 $$;
 
-DROP POLICY "Authenticated users can read drives" ON drives;
-CREATE POLICY "Students read visible drives" ON drives FOR SELECT TO authenticated
-  USING (status IN ('published','completed','cancelled'));
+DROP POLICY IF EXISTS "Authenticated users can read drives" ON drives;
+-- Preserve phase-one's eligible-drive policy. Permissive SELECT policies are
+-- OR-combined, so adding a broader policy would undo that authorization rule.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public'
+    AND tablename = 'drives' AND policyname = 'Students can read eligible published drives') THEN
+    CREATE POLICY "Students read visible drives" ON drives FOR SELECT TO authenticated
+      USING (status IN ('published','completed','cancelled'));
+  END IF;
+END;
+$$;
 CREATE POLICY "Students respond to own offers" ON offers FOR UPDATE TO authenticated
   USING (EXISTS (SELECT 1 FROM applications a WHERE a.id = application_id AND a.student_id = get_student_id()))
   WITH CHECK (EXISTS (SELECT 1 FROM applications a WHERE a.id = application_id AND a.student_id = get_student_id()));

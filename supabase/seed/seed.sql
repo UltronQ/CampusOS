@@ -1,31 +1,29 @@
--- Fresh disposable development database only. Provision these three Auth users
--- first: aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa (in-charge), and
--- bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1 / bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2 (students).
--- Run as the database owner for profile bootstrap, then exercise authenticated RLS.
--- File is atomic and intentionally fails on re-run instead of ignoring conflicts.
+-- Synthetic development data. Run as a trusted database owner after migrations.
+-- Never creates auth users or assigns roles. Existing in-charge profiles supply
+-- approval evidence; without one, terminal demo decisions remain pending.
 BEGIN;
-DO $$ BEGIN
-  IF (SELECT count(*) FROM auth.users WHERE id IN ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2')) <> 3 THEN
-    RAISE EXCEPTION 'Provision the three documented development Auth identities before seeding';
-  END IF;
-END $$;
+
+-- Historical fixtures deliberately include withdrawn/cancelled placements.
+-- Only the trusted table owner can suspend these lifecycle triggers; the
+-- transaction restores them before commit, without weakening runtime policies.
+DO $$
+DECLARE item record;
+BEGIN
+  FOR item IN SELECT tgrelid::regclass AS relation, tgname FROM pg_trigger
+    WHERE NOT tgisinternal AND tgrelid IN ('public.drives'::regclass,
+      'public.applications'::regclass, 'public.offers'::regclass,
+      'public.clearance_items'::regclass, 'public.student_clearances'::regclass)
+      AND tgname IN ('guard_drive', 'guard_application', 'guard_offer', 'guard_clearance_item', 'guard_student_clearance') LOOP
+    EXECUTE format('ALTER TABLE %s DISABLE TRIGGER %I', item.relation, item.tgname);
+  END LOOP;
+END;
+$$;
 
 -- Departments
 INSERT INTO departments (id, code, name) VALUES
   ('11111111-1111-1111-1111-111111111111', 'CSE', 'Computer Science'),
   ('22222222-2222-2222-2222-222222222222', 'ECE', 'Electronics'),
   ('33333333-3333-3333-3333-333333333333', 'ME', 'Mechanical');
-
--- Incharge profile (dummy auth user id for seed)
-INSERT INTO profiles (id, role) VALUES
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'placement_incharge'),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1', 'student'),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2', 'student');
-
-SELECT set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',true);
-SELECT set_config('request.jwt.claim.role','authenticated',true);
-SET LOCAL ROLE authenticated;
 
 -- Students
 INSERT INTO students (id, student_number, full_name, email, department_id, graduation_year, cgpa, phone) VALUES
@@ -71,44 +69,58 @@ UPDATE applications SET status='in_progress' WHERE id='a1000000-a100-a100-a100-a
 
 -- Offers
 INSERT INTO offers (id, application_id, status, annual_ctc_minor, currency) VALUES
-  ('b1000000-b100-b100-b100-b10000000001', 'a1000000-a100-a100-a100-a10000000001', 'offered', 10000000, 'INR'),
-  ('b1000000-b100-b100-b100-b10000000002', 'a1000000-a100-a100-a100-a10000000002', 'offered', 20000000, 'INR'),
-  ('b1000000-b100-b100-b100-b10000000003', 'a1000000-a100-a100-a100-a10000000003', 'offered', 99000000, 'INR'),
-  ('b1000000-b100-b100-b100-b10000000004', 'a1000000-a100-a100-a100-a10000000004', 'offered', 88000000, 'INR'),
-  ('b1000000-b100-b100-b100-b10000000005', 'a1000000-a100-a100-a100-a10000000005', 'offered', 77000000, 'INR'),
-  ('b1000000-b100-b100-b100-b10000000006', 'a1000000-a100-a100-a100-a10000000006', 'offered', NULL, 'INR'),
-  ('b1000000-b100-b100-b100-b10000000007', 'a1000000-a100-a100-a100-a10000000005', 'offered', 66000000, 'INR');
-
-UPDATE offers SET status='accepted' WHERE id IN ('b1000000-b100-b100-b100-b10000000002',
-  'b1000000-b100-b100-b100-b10000000003','b1000000-b100-b100-b100-b10000000004','b1000000-b100-b100-b100-b10000000006');
-UPDATE offers SET status='declined' WHERE id='b1000000-b100-b100-b100-b10000000005';
-UPDATE offers SET status='revoked' WHERE id='b1000000-b100-b100-b100-b10000000007';
-UPDATE applications SET status='withdrawn' WHERE id='a1000000-a100-a100-a100-a10000000004';
-UPDATE drives SET status='completed' WHERE id='e0000000-e000-e000-e000-e00000000002';
-UPDATE drives SET status='cancelled' WHERE id='e0000000-e000-e000-e000-e00000000003';
-
-INSERT INTO recruitment_stages(id,drive_id,name,sequence) VALUES
- ('91000000-0000-0000-0000-000000000001','e0000000-e000-e000-e000-e00000000001','Interview',1),
- ('91000000-0000-0000-0000-000000000002','e0000000-e000-e000-e000-e00000000002','Assessment',1),
- ('91000000-0000-0000-0000-000000000003','e0000000-e000-e000-e000-e00000000004','Unpublished Stage',1);
-INSERT INTO application_stage_results(id,application_id,stage_id,status,published_at) VALUES
- ('92000000-0000-0000-0000-000000000001','a1000000-a100-a100-a100-a10000000001','91000000-0000-0000-0000-000000000001','passed',now()),
- ('92000000-0000-0000-0000-000000000002','a1000000-a100-a100-a100-a10000000002','91000000-0000-0000-0000-000000000002','failed',NULL),
- ('92000000-0000-0000-0000-000000000003','a1000000-a100-a100-a100-a10000000006','91000000-0000-0000-0000-000000000002','passed',now());
+  ('f1000000-f100-f100-f100-f10000000001', 'a1000000-a100-a100-a100-a10000000001', 'offered', 10000000, 'INR'),
+  ('f1000000-f100-f100-f100-f10000000002', 'a1000000-a100-a100-a100-a10000000002', 'accepted', 20000000, 'INR'),
+  ('f1000000-f100-f100-f100-f10000000003', 'a1000000-a100-a100-a100-a10000000003', 'accepted', 99000000, 'INR'),
+  ('f1000000-f100-f100-f100-f10000000004', 'a1000000-a100-a100-a100-a10000000004', 'accepted', 88000000, 'INR'),
+  ('f1000000-f100-f100-f100-f10000000005', 'a1000000-a100-a100-a100-a10000000005', 'declined', 77000000, 'INR'),
+  ('f1000000-f100-f100-f100-f10000000006', 'a1000000-a100-a100-a100-a10000000006', 'accepted', NULL, 'INR'),
+  ('f1000000-f100-f100-f100-f10000000007', 'a1000000-a100-a100-a100-a10000000005', 'revoked', 66000000, 'INR'),
+  ('f1000000-f100-f100-f100-f10000000008', 'a1000000-a100-a100-a100-a10000000008', 'accepted', 55000000, 'INR')
+ON CONFLICT DO NOTHING;
 
 -- Clearance items
 INSERT INTO clearance_items (id, department_id, name, is_mandatory, is_active) VALUES
-  ('f1000000-f100-f100-f100-f10000000001', '11111111-1111-1111-1111-111111111111', 'Library', TRUE, TRUE),
-  ('f1000000-f100-f100-f100-f10000000002', '11111111-1111-1111-1111-111111111111', 'Lab', TRUE, TRUE),
-  ('f1000000-f100-f100-f100-f10000000003', '22222222-2222-2222-2222-222222222222', 'Library', TRUE, TRUE),
-  ('f1000000-f100-f100-f100-f10000000004', '11111111-1111-1111-1111-111111111111', 'Optional Survey', FALSE, TRUE),
-  ('f1000000-f100-f100-f100-f10000000005', '11111111-1111-1111-1111-111111111111', 'Old Checklist', TRUE, FALSE);
--- Student clearances
-INSERT INTO student_clearances (id, student_id, clearance_item_id, status, approved_by, approved_at) VALUES
-  ('c1000000-c100-c100-c100-c10000000001', '00000000-0000-0000-0000-000000000001', 'f1000000-f100-f100-f100-f10000000001', 'cleared', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '2026-10-12T09:00:00Z'),
-  ('c1000000-c100-c100-c100-c10000000002', '00000000-0000-0000-0000-000000000001', 'f1000000-f100-f100-f100-f10000000002', 'not_applicable', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '2026-10-12T09:00:00Z'),
-  ('c1000000-c100-c100-c100-c10000000003', '00000000-0000-0000-0000-000000000002', 'f1000000-f100-f100-f100-f10000000001', 'pending', NULL, NULL),
-  ('c1000000-c100-c100-c100-c10000000004', '00000000-0000-0000-0000-000000000004', 'f1000000-f100-f100-f100-f10000000003', 'cleared', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '2026-10-12T09:00:00Z'),
-  ('c1000000-c100-c100-c100-c10000000005', '00000000-0000-0000-0000-000000000001', 'f1000000-f100-f100-f100-f10000000004', 'pending', NULL, NULL),
-  ('c1000000-c100-c100-c100-c10000000006', '00000000-0000-0000-0000-000000000001', 'f1000000-f100-f100-f100-f10000000005', 'pending', NULL, NULL);
+  ('b1000000-b100-b100-b100-b10000000001', '11111111-1111-1111-1111-111111111111', 'Library', TRUE, TRUE),
+  ('b1000000-b100-b100-b100-b10000000002', '11111111-1111-1111-1111-111111111111', 'Lab', TRUE, TRUE),
+  ('b1000000-b100-b100-b100-b10000000003', '22222222-2222-2222-2222-222222222222', 'Library', TRUE, TRUE),
+  ('b1000000-b100-b100-b100-b10000000004', '11111111-1111-1111-1111-111111111111', 'Optional Survey', FALSE, TRUE),
+  ('b1000000-b100-b100-b100-b10000000005', '11111111-1111-1111-1111-111111111111', 'Old Checklist', TRUE, FALSE)
+ON CONFLICT DO NOTHING;
+
+-- Student clearances: terminal approvals require a real existing in-charge.
+WITH approver AS (
+  SELECT id FROM public.profiles WHERE role = 'placement_incharge' ORDER BY id LIMIT 1
+), decisions (id, student_id, clearance_item_id, status, approved_at) AS (
+  VALUES
+  ('c1000000-c100-c100-c100-c10000000001', '00000000-0000-0000-0000-000000000001', 'b1000000-b100-b100-b100-b10000000001', 'cleared', '2026-10-12T09:00:00Z'),
+  ('c1000000-c100-c100-c100-c10000000002', '00000000-0000-0000-0000-000000000001', 'b1000000-b100-b100-b100-b10000000002', 'not_applicable', '2026-10-12T09:00:00Z'),
+  ('c1000000-c100-c100-c100-c10000000003', '00000000-0000-0000-0000-000000000002', 'b1000000-b100-b100-b100-b10000000001', 'pending', NULL),
+  ('c1000000-c100-c100-c100-c10000000004', '00000000-0000-0000-0000-000000000004', 'b1000000-b100-b100-b100-b10000000003', 'cleared', '2026-10-12T09:00:00Z'),
+  ('c1000000-c100-c100-c100-c10000000005', '00000000-0000-0000-0000-000000000001', 'b1000000-b100-b100-b100-b10000000004', 'pending', NULL),
+  ('c1000000-c100-c100-c100-c10000000006', '00000000-0000-0000-0000-000000000001', 'b1000000-b100-b100-b100-b10000000005', 'pending', NULL)
+)
+INSERT INTO public.student_clearances
+  (id, student_id, clearance_item_id, status, approved_by, approved_at)
+SELECT d.id::uuid, d.student_id::uuid, d.clearance_item_id::uuid,
+  CASE WHEN a.id IS NULL THEN 'pending' ELSE d.status END::public.clearance_status,
+  CASE WHEN d.status IN ('cleared', 'not_applicable') THEN a.id END,
+  CASE WHEN a.id IS NOT NULL AND d.status IN ('cleared', 'not_applicable')
+    THEN d.approved_at::timestamptz END
+FROM decisions d LEFT JOIN approver a ON true
+ON CONFLICT DO NOTHING;
+
+DO $$
+DECLARE item record;
+BEGIN
+  FOR item IN SELECT tgrelid::regclass AS relation, tgname FROM pg_trigger
+    WHERE NOT tgisinternal AND tgrelid IN ('public.drives'::regclass,
+      'public.applications'::regclass, 'public.offers'::regclass,
+      'public.clearance_items'::regclass, 'public.student_clearances'::regclass)
+      AND tgname IN ('guard_drive', 'guard_application', 'guard_offer', 'guard_clearance_item', 'guard_student_clearance') LOOP
+    EXECUTE format('ALTER TABLE %s ENABLE TRIGGER %I', item.relation, item.tgname);
+  END LOOP;
+END;
+$$;
+
 COMMIT;
