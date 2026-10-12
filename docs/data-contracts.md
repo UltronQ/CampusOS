@@ -1,6 +1,6 @@
 # M3-1 data contracts and integration agreement
 
-Status: v1.1 aligned with Member 2's migrations 00001 through 00003. The phase-one correction is authorized across team ownership boundaries. The Problem Statement PDF has not been supplied; any PDF-specific rule takes priority. Import, analytics and export implementations belong to later phases and are not claimed complete here.
+Status: v1.2 aligned with Member 2's migrations 00001 through 00004. The phase-one correction and M2-2 integration are authorized across team ownership boundaries. The Problem Statement PDF has not been supplied; any PDF-specific rule takes priority. Import persistence is implemented by M2-2; parsing, analytics and exports remain later feature implementations.
 
 ## Files and ownership
 
@@ -24,6 +24,7 @@ All properties use snake_case matching proposed DB columns. IDs are opaque strin
 - departments: id, code (unique), name.
 - students: id, user_id (nullable unique auth link), student_number (unique), full_name, email (case-insensitive unique), department_id, graduation_year, cgpa (nullable NUMERIC(4,2), 0..10), phone (nullable text), backlogs (nullable nonnegative integer; unknown is not zero). Import department_code resolves to department_id; it is not a students column. Batch is represented by graduation_year.
 - companies: id, name.
+- M2-2 student extensions: program (nullable text), academic_year (nullable integer 1–8), section (nullable text), placement_registered (boolean default false), eligibility_status (pending | eligible | ineligible, default pending). They are management fields distinct from drive-threshold eligibility. Import settings/history and API details are in m2-2-authentication-student-services.md.
 - drives: id, company_id, title, start_date (date), status = draft | published | completed | cancelled, eligible_graduation_years (integer array; empty = all), min_cgpa (nullable 0..10), max_backlogs (nullable nonnegative integer), application_deadline (nullable timestamp).
 - drive_departments: drive_id, department_id (composite primary key with foreign keys). No rows for a drive means all departments. Drive/student deletion is blocked by linked applications; company deletion is blocked by linked drives.
 - applications: id, student_id, drive_id, status = applied | in_progress | selected | rejected | withdrawn; unique(student_id, drive_id).
@@ -37,7 +38,7 @@ Adapt future schema changes at the Member 3 data boundary and record any version
 
 ## Import validation and commit rules
 
-The current preview contract is insert-only and atomic. M3-2 must version the result contract before adding confirmed partial-import mode and successful/skipped/duplicate/failed summaries; no silent policy switch. CSV UTF-8 (BOM accepted) and XLSX are supported; use the first nonempty sheet and report its name, reject additional nonempty sheets to avoid silent omissions. Header names are exact IMPORT_HEADERS after trimming BOM/whitespace; unknown or duplicate headers are errors. First five fields are required; cgpa/phone/backlogs headers are optional. Ignore wholly blank rows, preserve physical row numbers, and reject a header-only file.
+The preview contract/current UI stays insert-only and atomic. Contract v1.2 adds confirmed persistence options and successful/skipped/duplicate/failed summaries; explicit partial mode is supported by the backend service and documented in m2-2-authentication-student-services.md. CSV UTF-8 (BOM accepted) and XLSX parsing is Member 3's next implementation; use the first nonempty sheet and report its name, reject additional nonempty sheets to avoid silent omissions. Header names are exact IMPORT_HEADERS after trimming BOM/whitespace; unknown or duplicate headers are errors. First five fields are required; cgpa/phone/backlogs headers are optional. Ignore wholly blank rows, preserve physical row numbers, and reject a header-only file.
 
 Trim all text. Full name/student number must be nonempty; student number is text. Lowercase email and validate a conventional email structure (no claim of deliverability). Uppercase department code and resolve exactly one database department. Graduation year must be a finite integer inside the explicit configured range. CGPA blank -> null, otherwise a finite decimal 0..10; reject malformed numeric text instead of coercing it to zero. Phone blank -> null; preserve leading +/zeroes and require only digits, spaces, hyphens or parentheses with 7..15 digits. Reject Excel error cells, formulas in import cells, unsafe/unsupported file types and files exceeding configured max_rows. Numerically stored student numbers/phones are errors because leading zeroes cannot be recovered reliably; tell users to format identifiers as text.
 
@@ -45,7 +46,7 @@ Duplicates by trimmed student_number or normalized email, within the file or aga
 
 Backlogs blank or omitted -> null (unknown); otherwise require a nonnegative integer within PostgreSQL INTEGER bounds. Do not coerce an unknown backlog count to zero. CGPA is validated before persistence; its database representation stores two decimal places.
 
-Member 2 integration: commitStudentImport(preview) revalidates all values, department references and uniqueness in a single trusted transaction. Client preview is untrusted. Success returns committed=true and an ID per source row; failure returns committed=false, inserted_count=0 and no students. Concurrent conflicts roll back all inserts; database errors must not leak SQL, secrets or another student's private record. Auth account provisioning is a separate Member 2 concern.
+Member 2 integration: commitStudentImport(preview, {confirmed:true}) revalidates values, department references and uniqueness in one trusted transaction. Client preview is untrusted. Atomic success returns committed=true and an ID per source row; rejection returns committed=false, inserted_count=0 and no students, with failed invalid rows and skipped otherwise-valid rows. Concurrent conflicts roll back atomic inserts; explicit partial mode skips conflicting identities and persists other valid rows. Every response includes authoritative successful_count, skipped_count, failed_count, duplicate_count, total_count, row_results and history_id. Database errors must not leak SQL, secrets or another student's private record. Auth account provisioning is through Supabase/trusted admin tooling, never a client-assigned role.
 
 ## Deterministic placement calculations
 

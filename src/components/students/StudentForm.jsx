@@ -66,7 +66,7 @@ function toValues(student) {
     graduation_year: student?.graduation_year ?? '',
     placement_registered: student?.placement_registered ? 'true' : 'false',
     eligibility_status: student?.eligibility_status ?? 'pending',
-    cgpa: student?.cgpa ?? '',
+    cgpa: String(student?.cgpa ?? ''),
     phone: student?.phone ?? '',
   };
 }

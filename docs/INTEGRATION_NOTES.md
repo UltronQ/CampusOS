@@ -22,6 +22,8 @@ Member 1's frontend foundation landed on `main` first and created two of the sam
 - Member 2's `studentService.js`, `recruitmentService.js` and `clearanceService.js` were updated to `getSupabase()` so they work against Member 1's client.
 
 ## Services (src/services)
+- M2-2 adds `studentManagementService.js`/`authSessionService.js` behind the stable `studentService.js`, `studentsService.js` and `authService.js` exports. See `docs/m2-2-authentication-student-services.md` for the full API, confirmation, count and authorization contract.
+- Apply migration `20251012000004_student_services.sql` after the phase-one migrations. It supplies Member 1's academic/registration columns, directory RPC, complete import context, secure import persistence and audit history.
 - `authService.js`: shared — Member 1 session boundary plus Member 2 helpers (getCurrentUser, getCurrentProfile, isPlacementIncharge, getStudentRecord)
 - `studentService.js`: listStudents, createStudent, updateStudent, getStudentById
 - `recruitmentService.js`: companies/drives/applications/offers/stages; `listStudentDrives()` supplies the read-only `/student/drives` page without accepting a student ID
