@@ -47,7 +47,7 @@ export const CLEARANCE_STATUSES = Object.freeze(['pending', 'cleared', 'not_appl
  * @property {number} max_graduation_year
  * @property {number} max_rows
  */
-/** @typedef {{contract_version:string, rows:ImportRowValidation[], file_errors:ValidationIssue[], total_rows:number, valid_rows:number, invalid_rows:number, warning_rows:number, can_commit:boolean}} ImportValidationResult */
+/** @typedef {{contract_version:string, rows:ImportRowValidation[], file_errors:ValidationIssue[], total_rows:number, valid_rows:number, invalid_rows:number, duplicate_rows:number, warning_rows:number, can_commit:boolean, can_commit_partial:boolean, filename:string, sheet_name:string|null, truncated:boolean}} ImportValidationResult */
 /** @typedef {{source_row:number, action:'insert', student:StudentImportRow, department_id:ID}} ImportPreviewRow */
 /**
  * Preview is not a persistence guarantee: Member 2 revalidates in a transaction.
@@ -56,7 +56,8 @@ export const CLEARANCE_STATUSES = Object.freeze(['pending', 'cleared', 'not_appl
  * @property {ImportPreviewRow[]} rows All eligible rows (UI may paginate).
  * @property {number} insert_count
  * @property {number} blocked_count
- * @property {'insert_only_atomic'} mode
+ * @property {'insert_only_atomic'|'insert_only_partial'} mode
+ * @property {boolean} can_commit Selected mode may be committed after confirmation.
  */
 /** @typedef {{source_row:number, student_id:ID}} ImportedStudent */
 /** @typedef {{source_row:number, status:'successful'|'skipped'|'failed', student_id?:ID, errors:ValidationIssue[]}} ImportRowOutcome */
@@ -142,7 +143,7 @@ export const CLEARANCE_STATUSES = Object.freeze(['pending', 'cleared', 'not_appl
 
 // Integration signatures (implementations belong in the modules documented below):
 /** @typedef {(file:File, context:ImportValidationContext) => Promise<ImportValidationResult>} ValidateStudentFile */
-/** @typedef {(validation:ImportValidationResult, context:ImportValidationContext) => ImportPreviewResult} BuildImportPreview */
+/** @typedef {(validation:ImportValidationResult, context:ImportValidationContext, options?:{mode?:'atomic'|'partial'}) => ImportPreviewResult} BuildImportPreview */
 /** @typedef {(preview:ImportPreviewResult, options:ImportCommitOptions) => Promise<ImportCommitResult>} CommitStudentImport */
 /** @typedef {(filters:PlacementAnalyticsFilters) => Promise<PlacementAnalyticsOutput>} GetPlacementAnalytics */
 /** @typedef {(filters:NoDuesAnalyticsFilters) => Promise<NoDuesAnalyticsOutput>} GetNoDuesAnalytics */

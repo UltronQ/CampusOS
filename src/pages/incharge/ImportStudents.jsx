@@ -1,351 +1,173 @@
 import { useRef, useState } from 'react';
 import ModulePage from '../../components/layout/ModulePage';
 import DataTable from '../../components/ui/DataTable';
-import StatusBadge from '../../components/ui/StatusBadge';
 import Button from '../../components/ui/Button';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { LoadingState, ErrorState, EmptyState } from '../../components/ui/States';
 import { IMPORT_HEADERS } from '../../features/data/contracts';
-import * as studentsService from '../../services/studentsService';
+import * as backend from '../../services/studentsService';
 
-/**
- * Module 1 — Validated CSV/XLSX student import (Placement In-Charge).
- *
- * Division of ownership:
- *  - Member 3 owns the parser: dynamic-imported from
- *    src/features/import/studentImport.js as validateStudentFile(file, context).
- *    If that module is not deployed yet, this page says so honestly — it never
- *    fabricates a preview or a success message.
- *  - Member 2 owns the trusted commit: studentsService.commitStudentImport
- *    calls RPC commit_student_import, which revalidates inside one transaction.
- *  - Member 1 (this file) owns file selection, template download, preview
- *    tables, error rendering and result counts.
- *
- * Atomicity: commit is insert-only and all-or-nothing, so a real commit
- * reports actual inserts on success or failed/skipped rows on rejection.
- * On atomic rejection, otherwise-valid rows are reported as skipped.
- */
-
-const TEMPLATE_HEADERS = IMPORT_HEADERS;
-
-/**
- * Optional-module lookup: Member 3's parser may not exist yet. import.meta.glob
- * builds cleanly with zero matches and starts using the module automatically
- * once src/features/import/studentImport.js is committed.
- */
-const PARSER_PATH = '../../features/import/studentImport.js';
-const parserModules = import.meta.glob('../../features/import/studentImport.js');
-
-function buildTemplateCsv() {
-  return `${TEMPLATE_HEADERS.join(',')}\r\n`;
-}
-
-function downloadTemplate() {
-  const blob = new Blob([buildTemplateCsv()], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = 'campusos_student_import_template.csv';
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-}
-
-function summarize(validation) {
-  return {
-    total: validation.total_rows,
-    successful: validation.valid_rows,
-    failed: validation.invalid_rows,
-    blocked: validation.invalid_rows + validation.file_errors.length,
-  };
-}
+// Parsing is lazy-loaded. Persistence is always Member 2's authorized service.
+const loadEngine = () => import('../../features/import/studentImport.js');
+const columns = [
+  { key: 'source_row', label: 'File row' },
+  { key: 'student_number', label: 'Roll number', render: (row) => row.normalized?.student_number ?? row.raw.student_number },
+  { key: 'full_name', label: 'Name', render: (row) => row.normalized?.full_name ?? row.raw.full_name },
+  { key: 'email', label: 'Email', render: (row) => row.normalized?.email ?? row.raw.email },
+  { key: 'department_code', label: 'Department', render: (row) => row.normalized?.department_code ?? row.raw.department_code },
+  { key: 'graduation_year', label: 'Batch', render: (row) => row.normalized?.graduation_year ?? row.raw.graduation_year },
+  { key: 'errors', label: 'Validation', render: (row) => row.errors.length ? (
+    <ul className="space-y-1 text-xs text-red-700">
+      {row.errors.map((issue, index) => <li key={index}>{issue.field ? issue.field + ': ' : ''}{issue.message}</li>)}
+    </ul>
+  ) : <span className="text-emerald-700">Ready</span> },
+];
 
 export default function ImportStudents() {
-  const fileInputRef = useRef(null);
-  const [fileName, setFileName] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [parserMissing, setParserMissing] = useState(null);
-  const [contextError, setContextError] = useState(null);
-  const [validation, setValidation] = useState(null);
+  const workflow = useRef(null);
+  const selectedFile = useRef(null);
+  const request = useRef(0);
   const [preview, setPreview] = useState(null);
-  const [commitError, setCommitError] = useState(null);
-  const [commitResult, setCommitResult] = useState(null);
+  const [mode, setMode] = useState('atomic');
+  const [busy, setBusy] = useState(false);
   const [committing, setCommitting] = useState(false);
+  const [templateBusy, setTemplateBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [result, setResult] = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  async function loadParser() {
-    const loader = parserModules[PARSER_PATH];
-    if (!loader) {
-      setParserMissing(
-        new Error(
-          'The import parser module (src/features/import/studentImport.js) is not available yet. ' +
-            'Member 3 owns validateStudentFile — once that module is committed, file validation ' +
-            'will run here. Nothing has been uploaded.',
-        ),
-      );
-      return null;
-    }
-    try {
-      return await loader();
-    } catch (err) {
-      setParserMissing(
-        new Error(`The import parser failed to load: ${err?.message ?? 'unknown error'}`),
-      );
-      return null;
-    }
+  async function getWorkflow() {
+    if (!workflow.current) workflow.current = (await loadEngine()).createStudentImportService(backend);
+    return workflow.current;
   }
-
-  async function handleFileSelect(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    // Reset all downstream state — a new file invalidates old results.
-    setFileName(file.name);
-    setValidation(null);
-    setPreview(null);
-    setCommitError(null);
-    setCommitResult(null);
-    setParserMissing(null);
-    setContextError(null);
-
-    const lower = file.name.toLowerCase();
-    if (!lower.endsWith('.csv') && !lower.endsWith('.xlsx')) {
-      setContextError(new Error('Unsupported file type. Upload a .csv or .xlsx file.'));
-      return;
-    }
-
-    setBusy(true);
+  async function prepare(file, chosenMode = mode) {
+    const revision = ++request.current;
+    selectedFile.current = file;
+    setPreview(null); setResult(null); setError(null); setConfirmOpen(false); setBusy(true);
     try {
-      const parser = await loadParser();
-      if (!parser) return;
-      if (typeof parser.validateStudentFile !== 'function') {
-        setParserMissing(
-          new Error('The parser module does not export validateStudentFile(file, context).'),
-        );
-        return;
-      }
-      // Client preview is untrusted; Member 2's commit revalidates everything.
-      const context = await studentsService.fetchImportContext();
-      const result = await parser.validateStudentFile(file, context);
-      setValidation(result);
-      if (typeof parser.buildImportPreview === 'function') {
-        setPreview(parser.buildImportPreview(result, context));
-      }
-    } catch (err) {
-      setContextError(err);
-    } finally {
-      setBusy(false);
-    }
+      const next = await (await getWorkflow()).previewFile(file, { mode: chosenMode });
+      if (revision === request.current) setPreview(next);
+    } catch (failure) { if (revision === request.current) setError(failure); }
+    finally { if (revision === request.current) setBusy(false); }
   }
-
-  async function handleCommit() {
-    if (!preview || !validation?.can_commit) return;
-    setCommitting(true);
-    setCommitError(null);
-    setCommitResult(null);
+  async function downloadTemplate(format) {
+    setTemplateBusy(true); setError(null);
+    try { (await loadEngine()).downloadImportTemplate(format); }
+    catch (failure) { setError(failure); }
+    finally { setTemplateBusy(false); }
+  }
+  async function changeMode(event) {
+    const nextMode = event.target.checked ? 'partial' : 'atomic';
+    setMode(nextMode); setConfirmOpen(false);
+    if (selectedFile.current) await prepare(selectedFile.current, nextMode);
+  }
+  async function confirmImport() {
+    if (!preview?.can_commit || committing) return;
+    setCommitting(true); setError(null);
     try {
-      const result = await studentsService.commitStudentImport(preview, { confirmed: true });
-      setCommitResult(result);
-    } catch (err) {
-      setCommitError(err);
-    } finally {
-      setCommitting(false);
-    }
+      setResult(await (await getWorkflow()).confirmImport(preview, { confirmed: true, mode }));
+    } catch (failure) { setError(failure); }
+    finally { setCommitting(false); setConfirmOpen(false); }
   }
-
-  const previewColumns = [
-    { key: 'source_row', label: 'Row', align: 'right' },
-    { key: 'student_number', label: 'Roll number' },
-    { key: 'full_name', label: 'Name' },
-    { key: 'email', label: 'Email' },
-    { key: 'department_code', label: 'Dept' },
-    { key: 'graduation_year', label: 'Batch', align: 'right' },
-    {
-      key: '_status',
-      label: 'Status',
-      render: (row) =>
-        row.errors.length > 0 ? (
-          <StatusBadge status="rejected" />
-        ) : row.warnings.length > 0 ? (
-          <StatusBadge status="pending" />
-        ) : (
-          <StatusBadge status="cleared" />
-        ),
-    },
-    {
-      key: '_issues',
-      label: 'Validation messages',
-      render: (row) => {
-        const messages = [
-          ...row.errors.map((issue) => `${issue.code}${issue.field ? ` (${issue.field})` : ''}: ${issue.message}`),
-          ...row.warnings.map((issue) => `Warning: ${issue.message}`),
-        ];
-        return messages.length > 0 ? (
-          <ul className="space-y-0.5 text-xs text-red-700">
-            {messages.map((message, index) => (
-              <li key={index}>{message}</li>
-            ))}
-          </ul>
-        ) : (
-          <span className="text-xs text-slate-400">—</span>
-        );
-      },
-    },
-  ];
-
-  const previewRows = validation
-    ? validation.rows.map((row) => ({
-        ...row,
-        student_number: row.normalized?.student_number ?? row.raw?.student_number ?? '',
-        full_name: row.normalized?.full_name ?? row.raw?.full_name ?? '',
-        email: row.normalized?.email ?? row.raw?.email ?? '',
-        department_code: row.normalized?.department_code ?? row.raw?.department_code ?? '',
-        graduation_year: row.normalized?.graduation_year ?? row.raw?.graduation_year ?? '',
-      }))
-    : [];
+  const validation = preview?.validation;
 
   return (
-    <ModulePage
-      title="Import Students"
-      description="Upload a CSV/XLSX of student records. Rows are validated before anything is written; the commit runs in a single trusted transaction and is all-or-nothing."
-    >
-      <section aria-label="Template" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-900">1. Template</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Columns: <span className="font-mono text-xs">{TEMPLATE_HEADERS.join(', ')}</span>.
-          The optional cgpa/phone columns may be omitted. Roll numbers must be formatted as text
-          so leading zeroes survive.
+    <ModulePage title="Import Students" description="Preview student records, correct errors, then confirm the import. Existing students are never overwritten.">
+      <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <h2 className="font-semibold">1. Download a template</h2>
+        <p className="mt-2 text-sm text-slate-600">
+          Templates contain fictional example rows. Replace them with your records.
+          Required columns: {IMPORT_HEADERS.slice(0, 5).join(', ')}.
+          CGPA, phone and backlogs are optional. Format roll numbers and phone numbers as text.
         </p>
-        <Button variant="secondary" onClick={downloadTemplate} className="mt-3">
-          ⬇ Download CSV template
-        </Button>
+        <div className="mt-3 flex flex-wrap gap-3">
+          <Button variant="secondary" busy={templateBusy} onClick={() => downloadTemplate('csv')}>Download CSV template</Button>
+          <Button variant="secondary" busy={templateBusy} onClick={() => downloadTemplate('xlsx')}>Download Excel template</Button>
+          <a className="self-center text-sm text-indigo-700 underline" href="/import/students-valid.csv" download>Valid CSV sample</a>
+          <a className="self-center text-sm text-indigo-700 underline" href="/import/students-invalid.xlsx" download>Invalid Excel sample</a>
+        </div>
       </section>
-
-      <section aria-label="File selection" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-900">2. Select file</h2>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".csv,.xlsx"
-          onChange={handleFileSelect}
-          aria-label="Choose CSV or XLSX file"
-          className="mt-3 block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-indigo-700"
-        />
-        {fileName ? (
-          <p className="mt-2 text-xs text-slate-500">
-            Selected: <span className="font-medium">{fileName}</span>
-          </p>
-        ) : null}
+      <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <h2 className="font-semibold">2. Select a CSV or Excel file</h2>
+        <label className="mt-3 flex items-start gap-2 text-sm text-slate-700">
+          <input type="checkbox" checked={mode === 'partial'} onChange={changeMode} disabled={busy || committing} className="mt-1" />
+          <span>Import only valid rows. Invalid rows and duplicates will be excluded.
+            Leave unchecked to require every row to be valid.</span>
+        </label>
+        <input type="file" accept=".csv,.xlsx" aria-label="Choose student import file"
+          disabled={busy || committing} className="mt-4 block w-full text-sm"
+          onClick={(event) => { event.currentTarget.value = ''; }}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) prepare(file);
+          }} />
+        <p className="mt-2 text-xs text-slate-500">UTF-8 CSV or .xlsx, up to 5 MB. Use one nonempty worksheet.</p>
       </section>
-
-      {busy ? <LoadingState label="Validating file…" /> : null}
-
-      {parserMissing ? <ErrorState title="Parser not available yet" error={parserMissing} /> : null}
-      {contextError ? <ErrorState title="Could not validate file" error={contextError} /> : null}
-
+      {busy ? <LoadingState label="Parsing and validating student records…" /> : null}
+      {error ? <ErrorState title="Import could not continue" error={error}>
+        Review the message and refresh the student directory before retrying an uncertain commit.
+      </ErrorState> : null}
       {validation ? (
-        <section aria-label="Preview" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900">3. Preview &amp; validation</h2>
-          <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-lg bg-slate-50 p-3">
-              <dt className="text-xs text-slate-500">Total rows</dt>
-              <dd className="text-lg font-semibold text-slate-900">{summarize(validation).total}</dd>
-            </div>
-            <div className="rounded-lg bg-emerald-50 p-3">
-              <dt className="text-xs text-emerald-700">Valid (would insert)</dt>
-              <dd className="text-lg font-semibold text-emerald-800">{summarize(validation).successful}</dd>
-            </div>
-            <div className="rounded-lg bg-red-50 p-3">
-              <dt className="text-xs text-red-700">Invalid (block import)</dt>
-              <dd className="text-lg font-semibold text-red-800">{summarize(validation).failed}</dd>
-            </div>
-            <div className="rounded-lg bg-amber-50 p-3">
-              <dt className="text-xs text-amber-700">Warning rows</dt>
-              <dd className="text-lg font-semibold text-amber-800">{validation.warning_rows}</dd>
-            </div>
+        <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
+          <h2 className="font-semibold">3. Preview: {validation.filename}</h2>
+          {validation.sheet_name ? <p className="text-sm text-slate-600">Worksheet: {validation.sheet_name}</p> : null}
+          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[['Parsed rows', validation.total_rows], ['Ready rows', validation.valid_rows],
+              ['Rejected rows', validation.invalid_rows], ['Duplicate rows', validation.duplicate_rows]].map(([label, count]) => (
+              <div key={label} className="rounded-lg bg-slate-50 p-3">
+                <dt className="text-xs text-slate-600">{label}</dt><dd className="text-xl font-semibold">{count}</dd>
+              </div>
+            ))}
           </dl>
-
-          {validation.file_errors.length > 0 ? (
-            <div className="mt-4">
-              <ErrorState title="File-level errors — import blocked">
-                <ul className="mt-2 space-y-1 text-left text-xs">
-                  {validation.file_errors.map((issue, index) => (
-                    <li key={index}>
-                      <span className="font-mono">{issue.code}</span>: {issue.message}
-                    </li>
-                  ))}
-                </ul>
-              </ErrorState>
-            </div>
+          {validation.file_errors.length ? (
+            <ErrorState title="File errors block every import mode">
+              <ul className="mt-2 space-y-1 text-left">
+                {validation.file_errors.map((issue, index) => <li key={index}>{issue.field ? issue.field + ': ' : ''}{issue.message}</li>)}
+              </ul>
+            </ErrorState>
           ) : null}
-
-          <div className="mt-4">
-            <DataTable
-              columns={previewColumns}
-              rows={previewRows}
-              caption="Import preview with validation results"
-              rowKey={(row) => row.source_row}
-              emptyTitle="File contains no data rows"
-              emptyMessage="The file parsed successfully but has no student rows."
-            />
-          </div>
-
-          <div className="mt-4 flex items-center justify-between gap-4">
-            <p className="text-xs text-slate-500">
-              {validation.can_commit
-                ? 'All rows valid. Committing writes every row in one transaction — if anything fails, nothing is written.'
-                : 'Import is blocked: fix every invalid row and re-upload. No rows will be written.'}
-            </p>
-            <Button onClick={handleCommit} disabled={!validation.can_commit} busy={committing}>
-              Commit {preview?.insert_count ?? 0} students
-            </Button>
-          </div>
+          <DataTable columns={columns} rows={validation.rows} rowKey={(row) => row.source_row}
+            caption="Student import preview with physical file row numbers" emptyTitle="No student rows" />
+          <p className="text-sm text-slate-600">
+            {preview.can_commit
+              ? mode === 'atomic'
+                ? 'Every row is ready. The database will import all rows or roll back the entire batch.'
+                : preview.insert_count + ' ready ' + (preview.insert_count === 1 ? 'row' : 'rows') + ' will be submitted; ' + preview.blocked_count + ' rejected rows will not be imported.'
+              : 'Correct the file errors or invalid rows before confirming. No rows have been written.'}
+          </p>
+          <Button onClick={() => setConfirmOpen(true)} disabled={!preview.can_commit || Boolean(result)} busy={committing}>
+            Review and confirm {preview.insert_count} {preview.insert_count === 1 ? 'student' : 'students'}
+          </Button>
         </section>
       ) : null}
-
-      {commitError ? <ErrorState title="Import commit failed — nothing was written" error={commitError} /> : null}
-
-      {commitResult ? (
-        <section aria-label="Commit result" className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
-          <h2 className="text-base font-semibold text-emerald-900">
-            {commitResult.committed ? 'Import committed' : 'Import rejected'}
-          </h2>
-          <dl className="mt-3 grid grid-cols-3 gap-3">
-            <div className="rounded-lg bg-white p-3">
-              <dt className="text-xs text-slate-500">Successful rows</dt>
-              <dd className="text-lg font-semibold text-emerald-800">{commitResult.successful_count}</dd>
-            </div>
-            <div className="rounded-lg bg-white p-3">
-              <dt className="text-xs text-slate-500">Failed rows</dt>
-              <dd className="text-lg font-semibold text-red-700">
-                {commitResult.failed_count}
-              </dd>
-            </div>
-            <div className="rounded-lg bg-white p-3">
-              <dt className="text-xs text-slate-500">Skipped rows</dt>
-              <dd className="text-lg font-semibold text-slate-700">{commitResult.skipped_count}</dd>
-            </div>
+      <ConfirmDialog open={confirmOpen} onClose={() => setConfirmOpen(false)} onConfirm={confirmImport}
+        title="Confirm student import" confirmLabel="Confirm import" busy={committing}
+        message={preview ? 'Import ' + preview.insert_count + ' ready ' + (preview.insert_count === 1 ? 'student' : 'students') + ' from ' + preview.validation.filename + '? ' +
+          (mode === 'partial' ? preview.blocked_count + ' rejected rows will be excluded. ' : 'This is an all-or-nothing import. ') +
+          'Existing records will never be overwritten.' : ''} />
+      {result ? (
+        <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5">
+          <h2 className="font-semibold">{result.committed ? 'Import completed' : 'No students imported'}</h2>
+          <dl className="grid grid-cols-3 gap-3">
+            {[['Successful', result.successful_count], ['Skipped', result.skipped_count], ['Failed', result.failed_count]].map(([label, count]) => (
+              <div key={label} className="rounded-lg bg-slate-50 p-3">
+                <dt className="text-sm text-slate-600">{label}</dt><dd className="text-xl font-semibold">{count}</dd>
+              </div>
+            ))}
           </dl>
-          <p className="mt-3 text-xs text-emerald-800">
-            Counts come from the database. This page uses atomic imports: if a row fails,
-            no students are inserted and the remaining valid rows are skipped.
+          <p className="text-sm text-slate-600">
+            Successful rows reflect database inserts. Skipped and failed rows include local validation rejections.
           </p>
-          {commitResult.row_results.filter((row) => row.status !== 'successful').map((row) => (
-            <p key={row.source_row} className="mt-2 text-sm text-red-700">
-              Row {row.source_row}: {row.errors.map((issue) => `${issue.field ? `${issue.field}: ` : ''}${issue.message}`).join(' ')}
+          {result.row_results.filter((row) => row.status !== 'successful').map((row) => (
+            <p key={row.source_row} className="text-sm text-red-700">
+              Row {row.source_row} ({row.status}): {row.errors.map((issue) => issue.message).join(' ')}
             </p>
           ))}
-          {commitResult.committed ? (
-            <Button variant="secondary" className="mt-3" onClick={() => window.location.assign('/incharge/students')}>
-              View students directory →
-            </Button>
-          ) : null}
+          <a href="/incharge/students" className="inline-block text-indigo-700 underline">View student directory</a>
         </section>
       ) : null}
-
-      {!busy && !validation && !parserMissing && !contextError ? (
-        <EmptyState title="No file selected yet">
-          Download the template, fill in your student records, then select the file above.
-          You will see a full preview with row-level validation before anything is written.
-        </EmptyState>
+      {!busy && !validation && !error ? (
+        <EmptyState title="Choose a file to preview">Nothing is saved until you review and explicitly confirm the import.</EmptyState>
       ) : null}
     </ModulePage>
   );

@@ -33,7 +33,7 @@ Department codes are trimmed/uppercased and unique; names are nonempty. Student 
 
 ## Member 3 import handoff
 
-Parsing and preview stay in Member 3's `src/features/import/studentImport.js` (not implemented by M2-2). Validation/preview never persists records. The import page still reports a missing parser honestly until that module exists.
+Parsing and preview stay in Member 3's `src/features/import/studentImport.js`, now implemented by [M3-2](m3-2-student-import.md). Validation/preview never persists records. The import page provides both file formats, row errors, partial-mode previews and explicit confirmation.
 
 After explicit user confirmation:
 
@@ -62,7 +62,7 @@ Local verification: all 30 regression checks passed, including both the phase-on
 
 Run `npm test`, then `npm run build`. SQL tests execute every migration in disposable PostgreSQL/PGlite instances; JWT/auth schema helpers are test-only. They cover in-charge CRUD, normalization, invalid fields, own-student RLS, denied role escalation, department restrictions, literal search/filters/pagination, missing confirmation, unauthorized RPCs, atomic rollback, duplicate groups, partial counts, no overwrites, configured limits and protected history. Auth tests use injected Supabase boundary mocks to verify both roles, failed login/logout, signed-out/mismatched sessions and event/profile races.
 
-Live Supabase login/session refresh and browser acceptance need actual project values and provisioned demo accounts; those are not claimed verified by mock auth tests. The parser, file templates and a partial-mode UI are Member 3/Member 1 follow-ups. Application mutation hardening and clearance/report services remain their later assigned phases.
+Live Supabase login/session refresh and hosted browser acceptance need actual project values and provisioned demo accounts; those are not claimed verified by mock auth tests. M3-2 supplies the parser, file templates and partial-mode UI with isolated browser/database tests. Application mutation hardening and clearance/report services remain their later assigned phases.
 
 Manual integration check: apply migrations, provision one in-charge and two linked students, log in/out as each, create/edit a student and department, reload and filter the directory, attempt cross-student direct requests, then submit a confirmed import through the service/RPC and compare database rows/history to returned counts. Test an invalid atomic batch and an existing-roll partial batch. No external database reset is needed.
 

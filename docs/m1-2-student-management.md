@@ -1,6 +1,6 @@
 # M1-2 student management interface
 
-Status: UI implemented; Member 2 schema/RPC is supplied by migration 00004. Member 3 parsing and live Supabase/browser acceptance remain pending. No fake uploads, no silent overwrites, no optimistic success anywhere.
+Status: UI implemented; Member 2 schema/RPC is supplied by migration 00004. [M3-2](m3-2-student-import.md) supplies parsing, templates, partial-mode confirmation and isolated browser/database acceptance. Live hosted Supabase acceptance remains pending. No fake uploads, no silent overwrites, no optimistic success anywhere.
 
 ## Files created/changed (Member 1)
 
@@ -58,8 +58,8 @@ Schema delta implemented by Member 2 migration 00004: program, academic_year, se
 3. Add student with missing fields -> inline validation errors, no request fires. Add valid student -> row appears after reload. Re-add same roll number -> red conflict error, original row unchanged (no silent overwrite).
 4. Edit the student (change batch/eligibility) -> persisted after refresh. Delete -> confirm dialog; a student with applications is rejected with the linked-records message.
 5. Filters: search by partial name/roll/email; department, batch, registration and eligibility selects narrow the table; Clear resets.
-6. /incharge/import: download template opens as header-only CSV with the current IMPORT_HEADERS (including backlogs). Without Member 3's parser: select a CSV -> "Parser not available yet" error, no preview, commit impossible.
-7. With parser deployed: upload file with two bad rows -> preview shows row-level codes, Commit disabled, zero writes. Fix file -> commit -> counts show successful=N, failed=0, skipped=0; directory lists the new students; duplicates against DB block with existing-record errors.
+6. /incharge/import: download CSV and XLSX templates with current IMPORT_HEADERS (including backlogs) and editable fictional examples. Upload either format and inspect physical row numbers and validation messages. Cancel confirmation and verify zero writes.
+7. Upload a file with bad rows -> atomic confirmation is disabled. Fix the file or explicitly choose partial mode -> confirm -> counts reconcile successful, skipped and failed outcomes; the directory lists actual new students. Existing identities are rejected without overwriting. See M3-2 for the reproducible mixed-file acceptance procedure.
 8. As student session: /incharge/students redirects to /unauthorized; direct table queries return only own row (RLS).
 
 ## Suggested commit
