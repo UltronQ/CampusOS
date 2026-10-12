@@ -15,12 +15,43 @@ export const APPLICATION_STATUSES = Object.freeze([
 ]);
 export const DRIVE_STATUSES = Object.freeze(['draft', 'published', 'completed', 'cancelled']);
 export const OFFER_STATUSES = Object.freeze(['offered', 'accepted', 'declined', 'revoked']);
-export const CLEARANCE_STATUSES = Object.freeze(['pending', 'cleared', 'not_applicable']);
+export const CLEARANCE_STATUSES = Object.freeze(['pending', 'cleared', 'not_applicable', 'rejected']);
+export const CLEARANCE_STATUS_LABELS = Object.freeze({
+  pending: 'Pending', cleared: 'Cleared', not_applicable: 'Not Applicable',
+  rejected: 'Rejected / Further Action Required',
+});
+export const NO_DUES_OVERALL_STATUSES = Object.freeze(['cleared', 'incomplete', 'not_configured']);
 
 /** @typedef {string} ID */
 /** @typedef {'placement_incharge'|'student'} UserRole */
-/** @typedef {'pending'|'cleared'|'not_applicable'} ClearanceStatus */
+/** @typedef {'pending'|'cleared'|'not_applicable'|'rejected'} ClearanceStatus */
+/** Legacy analytics DTO; map the workflow's incomplete bucket to pending. */
 /** @typedef {'pending'|'cleared'|'not_configured'} OverallClearanceStatus */
+/** @typedef {'cleared'|'incomplete'|'not_configured'} NoDuesOverallStatus */
+/**
+ * M2-4 statement items include every active category, including optional ones.
+ * Missing decisions are synthesized as pending with is_missing=true and null audit fields.
+ * @typedef {Object} NoDuesStatementItem
+ * @property {ID} clearance_item_id
+ * @property {string} name
+ * @property {boolean} is_mandatory
+ * @property {ID|null} student_clearance_id
+ * @property {ClearanceStatus} status
+ * @property {boolean} is_missing
+ * @property {string|null} remarks
+ * @property {string[]} pending_requirements
+ * @property {ID|null} approved_by
+ * @property {string|null} approved_at
+ * @property {ID|null} updated_by
+ * @property {string|null} updated_at
+ * @property {string} category_updated_at
+ */
+/** @typedef {{mandatory_total:number, mandatory_cleared:number, mandatory_not_applicable:number, mandatory_pending:number, mandatory_rejected:number, mandatory_missing:number}} NoDuesMandatoryCounts */
+/** @typedef {NoDuesMandatoryCounts & {student_id:ID, student_number:string, full_name:string, department_id:ID, department_code:string, graduation_year:number, overall_status:NoDuesOverallStatus, items:NoDuesStatementItem[], snapshot_at:string}} NoDuesStatement */
+/** @typedef {NoDuesMandatoryCounts & {total_students:number, cleared_students:number, incomplete_students:number, not_configured_students:number, clearance_rate:Rate}} NoDuesProgressTotals */
+/** @typedef {NoDuesProgressTotals & {department_id:ID, department_code:string}} NoDuesDepartmentProgress */
+/** @typedef {NoDuesProgressTotals & {graduation_year:number}} NoDuesBatchProgress */
+/** @typedef {{snapshot_at:string, totals:NoDuesProgressTotals, by_department:NoDuesDepartmentProgress[], by_batch:NoDuesBatchProgress[], by_department_batch:(NoDuesDepartmentProgress & NoDuesBatchProgress)[]}} NoDuesProgress */
 /** @typedef {{code:string, field:string|null, message:string}} ValidationIssue */
 /**
  * Spreadsheet row number includes header (first data row = 2).
