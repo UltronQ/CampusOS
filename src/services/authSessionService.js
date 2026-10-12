@@ -24,7 +24,10 @@ export function createRoleSessionResolver(service, publish) {
 }
 
 /** Production supplies the real Supabase client; injection enables isolated tests. */
-export function createAuthSessionService(getClient, configured = () => true) {
+export function createAuthSessionService(getClient, configured = () => true, {
+  getOrigin = () => globalThis.location?.origin,
+  isGoogleEnabled,
+} = {}) {
   async function fetchProfile(userId) {
     const { data, error } = await getClient().from('profiles').select('id, role').eq('id', userId).maybeSingle();
     if (error) throw toServiceError(error, 'Could not load your profile.');
@@ -58,6 +61,44 @@ export function createAuthSessionService(getClient, configured = () => true) {
     try {
       const profile = await fetchProfile(data.session.user.id);
       if (!profile) throw new DataServiceError('FORBIDDEN', 'Your account has no CampusOS role. Contact the Placement In-Charge.');
+      return { session: data.session, profile, role: profile.role };
+    } catch (failure) {
+      await signOut();
+      throw failure;
+    }
+  }
+  async function signInWithGoogle() {
+    if (!configured()) throw new DataServiceError('INVALID_INPUT', 'Supabase is not configured.');
+    let redirectTo;
+    try {
+      const origin = new URL(getOrigin());
+      if (origin.protocol !== 'https:' && !(origin.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname))) {
+        throw new Error('Insecure origin');
+      }
+      redirectTo = new URL('/auth/callback', origin.origin).href;
+    } catch {
+      throw new DataServiceError('INVALID_INPUT', 'Google sign-in requires HTTPS or a local development URL.');
+    }
+    if (isGoogleEnabled && !(await isGoogleEnabled())) {
+      throw new DataServiceError('FORBIDDEN', 'Google sign-in is not enabled for CampusOS yet. Use email and password or contact the Placement In-Charge.');
+    }
+    const { data, error } = await getClient().auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo, skipBrowserRedirect: true, queryParams: { prompt: 'select_account' } },
+    });
+    if (error || !data?.url) throw new DataServiceError('UNAUTHORIZED', 'Could not start Google sign-in. Please try again.');
+    return { url: data.url };
+  }
+  async function completeGoogleSignIn(code) {
+    if (!configured()) throw new DataServiceError('INVALID_INPUT', 'Supabase is not configured.');
+    if (typeof code !== 'string' || !code.trim()) throw new DataServiceError('INVALID_INPUT', 'Google sign-in returned no authorization code. Please try again.');
+    const { data, error } = await getClient().auth.exchangeCodeForSession(code);
+    if (error || !data?.session) throw new DataServiceError('UNAUTHORIZED', 'Google sign-in could not be completed. Start sign-in again in this browser.');
+    try {
+      const user = await getCurrentUser();
+      if (!user || user.id !== data.session.user.id) throw new DataServiceError('UNAUTHORIZED', 'Your Google session could not be verified.');
+      const profile = await fetchProfile(user.id);
+      if (!profile) throw new DataServiceError('FORBIDDEN', 'Your Google account has no CampusOS role. Contact the Placement In-Charge to provision your account.');
       return { session: data.session, profile, role: profile.role };
     } catch (failure) {
       await signOut();
@@ -100,7 +141,7 @@ export function createAuthSessionService(getClient, configured = () => true) {
       data.subscription.unsubscribe();
     };
   }
-  return { fetchProfile, getSession, signInWithPassword, signOut, onAuthStateChange,
+  return { fetchProfile, getSession, signInWithPassword, signInWithGoogle, completeGoogleSignIn, signOut, onAuthStateChange,
     getCurrentUser, getCurrentProfile, getStudentRecord, getRoleSession,
     isPlacementIncharge: async () => (await getCurrentProfile())?.role === 'placement_incharge' };
 }

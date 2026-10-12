@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { ROLE_HOME } from '../app/navigation';
+import { getAuthRedirectPath, OAUTH_RETURN_KEY } from '../app/authNavigation.js';
 import Button from '../components/ui/Button';
 import FormField from '../components/ui/FormField';
 import { ErrorState } from '../components/ui/States';
@@ -11,10 +12,11 @@ import { ErrorState } from '../components/ui/States';
  * fake sessions. On success the user is routed by their backend role.
  */
 export default function SignIn() {
-  const { session, role, loading, error, signIn } = useAuth();
+  const { session, role, loading, error, signIn, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -28,7 +30,7 @@ export default function SignIn() {
   // Already signed in? Route by backend role, never by client guesswork.
   if (!loading && session) {
     if (role && ROLE_HOME[role]) {
-      const target = from && !ROLE_HOME[role].startsWith(from) ? from : ROLE_HOME[role];
+      const target = getAuthRedirectPath(role, from);
       return <Navigate to={target} replace />;
     }
     return <Navigate to="/unauthorized" replace />;
@@ -42,13 +44,27 @@ export default function SignIn() {
       const { profile } = await signIn(email.trim(), password);
       // Return to the originally requested page only when the backend role
       // grants that area; otherwise go to the role home (or unauthorized).
-      const rolePrefix = profile?.role === 'student' ? '/student' : profile?.role === 'placement_incharge' ? '/incharge' : null;
-      const safeFrom = rolePrefix && from?.startsWith(`${rolePrefix}/`) ? from : null;
-      navigate(safeFrom ?? ROLE_HOME[profile?.role] ?? '/unauthorized', { replace: true });
+      navigate(getAuthRedirectPath(profile?.role, from), { replace: true });
     } catch (err) {
       setFormError(err);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    setFormError(null);
+    setGoogleSubmitting(true);
+    try {
+      const { url } = await signInWithGoogle();
+      try {
+        if (typeof from === 'string') sessionStorage.setItem(OAUTH_RETURN_KEY, from);
+        else sessionStorage.removeItem(OAUTH_RETURN_KEY);
+      } catch { /* Storage is optional; callback falls back to the role home. */ }
+      window.location.assign(url);
+    } catch (err) {
+      setFormError(err);
+      setGoogleSubmitting(false);
     }
   }
 
@@ -89,10 +105,18 @@ export default function SignIn() {
           {formError ? (
             <ErrorState title="Sign-in failed" error={formError} />
           ) : null}
-          <Button type="submit" busy={submitting} className="w-full">
+          <Button type="submit" busy={submitting} disabled={googleSubmitting || loading || Boolean(error)} className="w-full">
             {submitting ? 'Signing in…' : 'Sign in'}
           </Button>
         </form>
+
+        <div className="my-5 flex items-center gap-3 text-xs text-slate-400">
+          <span className="h-px flex-1 bg-slate-200" /><span>or</span><span className="h-px flex-1 bg-slate-200" />
+        </div>
+        <Button variant="secondary" busy={googleSubmitting} disabled={submitting || loading || Boolean(error)}
+          onClick={handleGoogleSignIn} className="w-full">
+          {googleSubmitting ? 'Connecting to Google…' : 'Continue with Google'}
+        </Button>
 
         <p className="mt-6 text-center text-xs text-slate-400">
           Accounts are provisioned by the Placement In-Charge.
