@@ -1,6 +1,6 @@
 # M1-2 student management interface
 
-Status: UI complete; depends on Member 2 schema/RPC and Member 3 parser for end-to-end behavior. No fake uploads, no silent overwrites, no optimistic success anywhere.
+Status: UI implemented; Member 2 schema/RPC is supplied by migration 00004. Member 3 parsing and live Supabase/browser acceptance remain pending. No fake uploads, no silent overwrites, no optimistic success anywhere.
 
 ## Files created/changed (Member 1)
 
@@ -28,12 +28,12 @@ Status: UI complete; depends on Member 2 schema/RPC and Member 3 parser for end-
 | Eligibility status | students.eligibility_status (NEW) | 'pending' \| 'eligible' \| 'ineligible' (proposed — confirm enum) |
 | (optional, contract v1) cgpa, phone | students.cgpa, students.phone | nullable |
 
-Schema delta vs docs/data-contracts.md: five NEW columns (program, academic_year, section, placement_registered, eligibility_status). Member 2 adds them in the students migration; if names change, only src/services/studentsService.js needs edits — pages and hooks keep their shapes.
+Schema delta implemented by Member 2 migration 00004: program, academic_year, section, placement_registered and eligibility_status. src/services/studentsService.js now re-exports Member 2's shared implementation, retaining the existing UI names and aliased department join.
 
 ## For Member 2 — what this UI calls
 
 1. Tables departments(id, code, name) and students as mapped above, with RLS: placement_incharge full write, student read-own only.
-2. RPC commit_student_import(p_rows jsonb) — SECURITY DEFINER, revalidates every value, department reference and uniqueness (against DB, not the preview) inside one transaction. Insert-only. Returns { committed boolean, inserted_count int, students [{source_row, student_id}], errors [{code, field, message}] }. On any failure: committed=false, inserted_count=0, zero rows written.
+2. RPC commit_student_import(p_rows jsonb, p_confirmed boolean, p_mode text default 'atomic') — SECURITY DEFINER, explicitly checks caller role and revalidates values/references/uniqueness. The UI calls commitStudentImport(preview, {confirmed:true}) only on the preview commit click. Atomic rejection inserts zero. Contract v1.2 also returns successful_count, skipped_count, failed_count, duplicate_count, total_count, row_results and history_id, with source-row diagnostics. Explicit partial mode is available to service callers; the current UI stays atomic.
 3. Unique constraints: students.student_number, students.email. Conflicts must raise 23505 (the UI maps it to a friendly no-overwrite message).
 4. FK students.department_id → departments.id; keep ON DELETE RESTRICT so the directory's delete surfaces linked-record errors instead of orphaning placements.
 
@@ -43,7 +43,7 @@ Schema delta vs docs/data-contracts.md: five NEW columns (program, academic_year
 - context is built by studentsService.fetchImportContext(): { departments:[{id,code}], existing_students:[{id,student_number,email}], min_graduation_year:2026, max_graduation_year:2030, max_rows:1000 }.
 - Template download emits header-only CSV of IMPORT_HEADERS (imported read-only from contracts.js).
 - Preview table renders ImportRowValidation rows: source_row, normalized values, errors[]/warnings[] with contract codes; file_errors render as a blocking banner; Commit button is disabled unless can_commit.
-- Post-commit counts: successful = inserted_count, failed = invalid_rows on rejection, skipped = 0 (atomic insert-only).
+- Post-commit counts and rejected-row messages come directly from the database response. Atomic rejection marks invalid rows failed and otherwise-valid aborted rows skipped. No client-side estimate is shown as a persistence outcome.
 
 ## For Member 1 follow-ups
 
@@ -58,7 +58,7 @@ Schema delta vs docs/data-contracts.md: five NEW columns (program, academic_year
 3. Add student with missing fields -> inline validation errors, no request fires. Add valid student -> row appears after reload. Re-add same roll number -> red conflict error, original row unchanged (no silent overwrite).
 4. Edit the student (change batch/eligibility) -> persisted after refresh. Delete -> confirm dialog; a student with applications is rejected with the linked-records message.
 5. Filters: search by partial name/roll/email; department, batch, registration and eligibility selects narrow the table; Clear resets.
-6. /incharge/import: download template opens as header-only CSV with 7 columns. Without Member 3's parser: select a CSV -> "Parser not available yet" error, no preview, commit impossible.
+6. /incharge/import: download template opens as header-only CSV with the current IMPORT_HEADERS (including backlogs). Without Member 3's parser: select a CSV -> "Parser not available yet" error, no preview, commit impossible.
 7. With parser deployed: upload file with two bad rows -> preview shows row-level codes, Commit disabled, zero writes. Fix file -> commit -> counts show successful=N, failed=0, skipped=0; directory lists the new students; duplicates against DB block with existing-record errors.
 8. As student session: /incharge/students redirects to /unauthorized; direct table queries return only own row (RLS).
 
